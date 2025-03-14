@@ -158,12 +158,12 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const currentScanY = minY + scanLineRef.current;
 
       if (currentScanY >= minY && currentScanY <= maxY) {
-        // Enhanced blur effect
-        ctx.filter = 'blur(25px)';
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = 'rgba(255, 255, 0, 0.5)';
+        // Enhanced blur and glow effect
+        ctx.filter = 'blur(45px)';  // Increased blur
+        ctx.shadowBlur = 40;        // Increased shadow blur
+        ctx.shadowColor = 'rgba(255, 255, 0, 0.3)';  // Reduced opacity
 
-        const curveHeight = 25;
+        const curveHeight = 30;  // Increased curve height for more pronounced effect
         const controlPoints = [];
         const numPoints = 50;
 
@@ -177,7 +177,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           });
         }
 
-        // Draw main glow
+        // Draw main glow with softer gradient
         ctx.beginPath();
         ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
         
@@ -187,25 +187,25 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           ctx.quadraticCurveTo(controlPoints[i].x, controlPoints[i].y, xc, yc);
         }
         
-        // Gradient effect for more natural light appearance
+        // Softer gradient effect
         const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
         gradient.addColorStop(0, 'rgba(255, 255, 0, 0)');
-        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.8)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 1)');
-        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.8)');
+        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.4)');  // Reduced opacity
+        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.6)');  // Reduced opacity
+        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.4)');  // Reduced opacity
         gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
 
         ctx.strokeStyle = gradient;
-        ctx.lineWidth = 8;
+        ctx.lineWidth = 12;  // Increased line width
         ctx.stroke();
 
-        // Additional glow layers
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
-        ctx.lineWidth = 15;
+        // Additional softer glow layers
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.15)';  // Reduced opacity
+        ctx.lineWidth = 20;
         ctx.stroke();
         
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.1)';
-        ctx.lineWidth = 25;
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.05)';  // Reduced opacity
+        ctx.lineWidth = 35;
         ctx.stroke();
 
         ctx.filter = 'none';
