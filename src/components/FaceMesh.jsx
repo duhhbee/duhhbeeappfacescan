@@ -134,7 +134,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(255, 255, 0, 0.08)',
+        color: 'rgba(255, 255, 0, 0.15)',
         lineWidth: 1
       });
 
@@ -143,7 +143,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const faceWidth = maxX - minX;
       const faceCenterX = minX + faceWidth / 2;
 
-      const scanSpeed = 1;
+      // Reduced scan speed
+      const scanSpeed = 1.5;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
 
       if (scanLineRef.current >= faceHeight) {
@@ -157,62 +158,58 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const currentScanY = minY + scanLineRef.current;
 
       if (currentScanY >= minY && currentScanY <= maxY) {
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        
-        // Create multiple layers of glow using shadows
-        for (let i = 0; i < 3; i++) {
-          const curveHeight = 30 - (i * 5);
-          const controlPoints = [];
-          const numPoints = 50;
+        // Enhanced blur effect
+        ctx.filter = 'blur(25px)';
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = 'rgba(255, 255, 0, 0.5)';
 
-          for (let j = 0; j < numPoints; j++) {
-            const x = minX + (j / (numPoints - 1)) * faceWidth;
-            const distanceFromCenter = Math.abs(x - faceCenterX);
-            const curveOffset = Math.cos((distanceFromCenter / faceWidth) * Math.PI) * curveHeight;
-            controlPoints.push({
-              x: x,
-              y: currentScanY + curveOffset
-            });
-          }
+        const curveHeight = 25;
+        const controlPoints = [];
+        const numPoints = 50;
 
-          ctx.beginPath();
-          ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
-          
-          for (let k = 1; k < controlPoints.length - 2; k++) {
-            const xc = (controlPoints[k].x + controlPoints[k + 1].x) / 2;
-            const yc = (controlPoints[k].y + controlPoints[k + 1].y) / 2;
-            ctx.quadraticCurveTo(controlPoints[k].x, controlPoints[k].y, xc, yc);
-          }
-
-          // Inner glow
-          ctx.shadowColor = 'rgba(255, 255, 0, 0.8)';
-          ctx.shadowBlur = 30 + (i * 15);
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-          ctx.strokeStyle = `rgba(255, 255, 0, ${0.6 - (i * 0.15)})`;
-          ctx.lineWidth = 4 - i;
-          ctx.stroke();
-
-          // Outer glow
-          ctx.shadowColor = 'rgba(255, 255, 100, 0.4)';
-          ctx.shadowBlur = 50 + (i * 20);
-          ctx.strokeStyle = `rgba(255, 255, 100, ${0.3 - (i * 0.08)})`;
-          ctx.lineWidth = 2;
-          ctx.stroke();
+        for (let i = 0; i < numPoints; i++) {
+          const x = minX + (i / (numPoints - 1)) * faceWidth;
+          const distanceFromCenter = Math.abs(x - faceCenterX);
+          const curveOffset = Math.cos((distanceFromCenter / faceWidth) * Math.PI) * curveHeight;
+          controlPoints.push({
+            x: x,
+            y: currentScanY + curveOffset
+          });
         }
 
-        // Add central bright line
-        ctx.shadowColor = 'rgba(255, 255, 150, 0.9)';
-        ctx.shadowBlur = 15;
+        // Draw main glow
         ctx.beginPath();
-        ctx.moveTo(minX, currentScanY);
-        ctx.lineTo(maxX, currentScanY);
-        ctx.strokeStyle = 'rgba(255, 255, 150, 0.9)';
-        ctx.lineWidth = 2;
+        ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
+        
+        for (let i = 1; i < controlPoints.length - 2; i++) {
+          const xc = (controlPoints[i].x + controlPoints[i + 1].x) / 2;
+          const yc = (controlPoints[i].y + controlPoints[i + 1].y) / 2;
+          ctx.quadraticCurveTo(controlPoints[i].x, controlPoints[i].y, xc, yc);
+        }
+        
+        // Gradient effect for more natural light appearance
+        const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
+        gradient.addColorStop(0, 'rgba(255, 255, 0, 0)');
+        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.8)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 1)');
+        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.8)');
+        gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
+
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 8;
         ctx.stroke();
 
-        ctx.restore();
+        // Additional glow layers
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+        ctx.lineWidth = 15;
+        ctx.stroke();
+        
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.1)';
+        ctx.lineWidth = 25;
+        ctx.stroke();
+
+        ctx.filter = 'none';
+        ctx.shadowBlur = 0;
       }
     };
 
@@ -275,11 +272,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        overflow: 'hidden',
-        WebkitBackfaceVisibility: 'hidden',
-        WebkitPerspective: 1000,
-        WebkitTransform: 'translate3d(0,0,0)',
-        WebkitTransformStyle: 'preserve-3d'
+        overflow: 'hidden'
       }}
     >
       <div
@@ -289,9 +282,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           height: dimensions.height,
           maxWidth: '100%',
           maxHeight: '100vh',
-          WebkitBackfaceVisibility: 'hidden',
-          WebkitPerspective: 1000,
-          WebkitTransform: 'translate3d(0,0,0)',
         }}
       >
         <video
@@ -303,9 +293,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             width: '100%',
             height: '100%',
             transform: 'scaleX(-1)',
-            objectFit: 'cover',
-            WebkitBackfaceVisibility: 'hidden',
-            WebkitTransform: 'translate3d(0,0,0) scaleX(-1)'
+            objectFit: 'cover'
           }}
           autoPlay
           playsInline
@@ -320,9 +308,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             left: 0,
             width: '100%',
             height: '100%',
-            transform: 'scaleX(-1)',
-            WebkitBackfaceVisibility: 'hidden',
-            WebkitTransform: 'translate3d(0,0,0) scaleX(-1)'
+            transform: 'scaleX(-1)'
           }}
         />
       </div>
