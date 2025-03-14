@@ -7,7 +7,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const scanLineRef = useRef(0);
-  const scanDirectionRef = useRef(1); // 1 for down, -1 for up
+  const scanDirectionRef = useRef(1);
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
 
   const checkLighting = (landmarks) => {
@@ -28,27 +28,20 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   useEffect(() => {
     const calculateDimensions = () => {
       const isMobile = window.matchMedia("(max-width: 768px)").matches;
-      const aspectRatio = isMobile ? 3 / 4 : 4 / 3; // Invert aspect ratio for mobile
       let newWidth, newHeight;
 
       if (isMobile) {
-        // For mobile, prioritize height
-        newWidth = Math.min(windowWidth, 720);
-        newHeight = newWidth / aspectRatio;
-        
-        // Ensure height doesn't exceed viewport
-        if (newHeight > windowHeight) {
-          newHeight = windowHeight;
-          newWidth = newHeight * aspectRatio;
-        }
+        // For mobile, use full viewport height and maintain aspect ratio
+        newHeight = windowHeight;
+        newWidth = (newHeight * 3) / 4; // 3:4 aspect ratio for portrait
       } else {
-        // Desktop behavior remains the same
-        if (windowWidth / windowHeight > aspectRatio) {
-          newHeight = Math.min(windowHeight, 720);
-          newWidth = newHeight * aspectRatio;
+        // For desktop, maintain 4:3 aspect ratio
+        if (windowWidth / windowHeight > 4/3) {
+          newHeight = windowHeight;
+          newWidth = (newHeight * 4) / 3;
         } else {
-          newWidth = Math.min(windowWidth, 960);
-          newHeight = newWidth / aspectRatio;
+          newWidth = windowWidth;
+          newHeight = (newWidth * 3) / 4;
         }
       }
 
@@ -57,7 +50,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
     calculateDimensions();
     window.addEventListener('resize', calculateDimensions);
-
     return () => window.removeEventListener('resize', calculateDimensions);
   }, [windowWidth, windowHeight]);
 
@@ -103,61 +95,37 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     const drawFaceMesh = (ctx, landmarks) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
-      // Draw the tesselation with yellow color and lower opacity
       ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(255, 255, 0, 0.15)'; // Reduced opacity to 15%
+      ctx.strokeStyle = 'rgba(255, 255, 0, 0.15)';
       
-      // Draw face mesh lines
-      for (let i = 0; i < FACEMESH_TESSELATION.length; i++) {
-        const connection = FACEMESH_TESSELATION[i];
-        const start = landmarks[connection[0]];
-        const end = landmarks[connection[1]];
+      drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
+        color: 'rgba(255, 255, 0, 0.15)',
+        lineWidth: 1
+      });
 
-        if (!isValidCoordinate(start.x) || !isValidCoordinate(start.y) ||
-            !isValidCoordinate(end.x) || !isValidCoordinate(end.y)) {
-          continue;
-        }
-
-        ctx.beginPath();
-        ctx.moveTo(
-          start.x * canvasElement.width,
-          start.y * canvasElement.height
-        );
-        ctx.lineTo(
-          end.x * canvasElement.width,
-          end.y * canvasElement.height
-        );
-        ctx.stroke();
-      }
-
-      // Get face bounds for scan line
       const { minX, minY, maxX, maxY } = getFaceBoundingBox(landmarks);
       const faceHeight = maxY - minY;
       const faceWidth = maxX - minX;
       const faceCenterX = minX + faceWidth / 2;
 
-      // Update scan line position with direction change
       const scanSpeed = 4;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
 
-      // Change direction when reaching bounds
       if (scanLineRef.current >= faceHeight) {
-        scanDirectionRef.current = -1; // Start moving up
+        scanDirectionRef.current = -1;
         scanLineRef.current = faceHeight;
       } else if (scanLineRef.current <= 0) {
-        scanDirectionRef.current = 1; // Start moving down
+        scanDirectionRef.current = 1;
         scanLineRef.current = 0;
       }
 
       const currentScanY = minY + scanLineRef.current;
 
       if (currentScanY >= minY && currentScanY <= maxY) {
-        // Create curved scan line
         ctx.beginPath();
-        ctx.filter = 'blur(15px)'; // Add blur effect to the scan line
+        ctx.filter = 'blur(15px)';
 
-        // Create curved path for scan line
-        const curveHeight = 20; // Height of the curve
+        const curveHeight = 20;
         const controlPoints = [];
         const numPoints = 50;
 
@@ -171,7 +139,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           });
         }
 
-        // Draw the curved path
         ctx.beginPath();
         ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
         
@@ -181,11 +148,10 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           ctx.quadraticCurveTo(controlPoints[i].x, controlPoints[i].y, xc, yc);
         }
         
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // Bright yellow for scan line
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
         ctx.lineWidth = 4;
         ctx.stroke();
 
-        // Add glow effect
         ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
         ctx.lineWidth = 8;
         ctx.stroke();
@@ -194,7 +160,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         ctx.lineWidth = 12;
         ctx.stroke();
 
-        ctx.filter = 'none'; // Reset blur filter
+        ctx.filter = 'none';
       }
     };
 
@@ -209,9 +175,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           image: null
         };
         
-        console.log('Face Detection Data:', data);
         window.parent.postMessage(JSON.stringify(data), '*');
-        
         return;
       }
 
@@ -231,14 +195,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         image
       };
 
-      console.log('Face Detection Data:', {
-        ...data,
-        image: data.image ? 'base64_image_data' : null,
-        timestamp: new Date().toISOString()
-      });
-
       window.parent.postMessage(JSON.stringify(data), '*');
-
       canvasCtx.restore();
     });
 
@@ -248,7 +205,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       },
       width: dimensions.width,
       height: dimensions.height,
-      facingMode: 'user'
+      facingMode: { exact: "user" }
     });
 
     camera.start();
@@ -288,7 +245,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             left: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            transform: 'scaleX(-1)',
+            objectFit: 'cover'
           }}
           autoPlay
           playsInline
@@ -303,6 +261,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             left: 0,
             width: '100%',
             height: '100%',
+            transform: 'scaleX(-1)'
           }}
         />
       </div>
