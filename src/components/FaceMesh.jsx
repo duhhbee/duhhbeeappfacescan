@@ -10,6 +10,21 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const scanDirectionRef = useRef(1); // 1 for down, -1 for up
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
 
+  const checkLighting = (landmarks) => {
+    const avgBrightness = landmarks.reduce((sum, point) => sum + point.y, 0) / landmarks.length;
+    return avgBrightness > 0.2 && avgBrightness < 0.8;
+  };
+
+  const checkPosition = (landmarks) => {
+    const centerX = landmarks.reduce((sum, point) => sum + point.x, 0) / landmarks.length;
+    const centerY = landmarks.reduce((sum, point) => sum + point.y, 0) / landmarks.length;
+    return (centerX > 0.3 && centerX < 0.7 && centerY > 0.3 && centerY < 0.7);
+  };
+
+  const captureImage = (canvas) => {
+    return canvas.toDataURL('image/jpeg', 0.8);
+  };
+
   useEffect(() => {
     const calculateDimensions = () => {
       // Use a more square-like aspect ratio to better fit faces
@@ -43,7 +58,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
     const faceMesh = new FaceMesh({
       locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`,
     });
 
     faceMesh.setOptions({
@@ -176,12 +191,44 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     faceMesh.onResults((results) => {
       if (!results.multiFaceLandmarks || !results.multiFaceLandmarks.length) {
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        
+        const data = {
+          faceFound: false,
+          lighting: false,
+          position: false,
+          image: null
+        };
+        
+        console.log('Face Detection Data:', data);
+        window.parent.postMessage(JSON.stringify(data), '*');
+        
         return;
       }
 
       canvasCtx.save();
       const landmarks = results.multiFaceLandmarks[0];
       drawFaceMesh(canvasCtx, landmarks);
+
+      const lighting = checkLighting(landmarks);
+      const position = checkPosition(landmarks);
+      const faceFound = true;
+      const image = (lighting && position) ? captureImage(canvasElement) : null;
+
+      const data = {
+        faceFound,
+        lighting,
+        position,
+        image
+      };
+
+      console.log('Face Detection Data:', {
+        ...data,
+        image: data.image ? 'base64_image_data' : null,
+        timestamp: new Date().toISOString()
+      });
+
+      window.parent.postMessage(JSON.stringify(data), '*');
+
       canvasCtx.restore();
     });
 
