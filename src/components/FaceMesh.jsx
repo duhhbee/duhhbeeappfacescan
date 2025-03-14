@@ -27,19 +27,29 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
   useEffect(() => {
     const calculateDimensions = () => {
-      // Use a more square-like aspect ratio to better fit faces
-      const aspectRatio = 4 / 3;
+      const isMobile = window.matchMedia("(max-width: 768px)").matches;
+      const aspectRatio = isMobile ? 3 / 4 : 4 / 3; // Invert aspect ratio for mobile
       let newWidth, newHeight;
 
-      // Calculate dimensions to fit the container while maintaining aspect ratio
-      if (windowWidth / windowHeight > aspectRatio) {
-        // Container is wider than needed
-        newHeight = Math.min(windowHeight, 720); // Cap height at 720px
-        newWidth = newHeight * aspectRatio;
-      } else {
-        // Container is taller than needed
-        newWidth = Math.min(windowWidth, 960); // Cap width at 960px
+      if (isMobile) {
+        // For mobile, prioritize height
+        newWidth = Math.min(windowWidth, 720);
         newHeight = newWidth / aspectRatio;
+        
+        // Ensure height doesn't exceed viewport
+        if (newHeight > windowHeight) {
+          newHeight = windowHeight;
+          newWidth = newHeight * aspectRatio;
+        }
+      } else {
+        // Desktop behavior remains the same
+        if (windowWidth / windowHeight > aspectRatio) {
+          newHeight = Math.min(windowHeight, 720);
+          newWidth = newHeight * aspectRatio;
+        } else {
+          newWidth = Math.min(windowWidth, 960);
+          newHeight = newWidth / aspectRatio;
+        }
       }
 
       setDimensions({ width: newWidth, height: newHeight });
@@ -236,6 +246,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       onFrame: async () => {
         await faceMesh.send({ image: videoElement });
       },
+      width: dimensions.width,
+      height: dimensions.height,
+      facingMode: 'user'
     });
 
     camera.start();
@@ -275,7 +288,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             left: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: 'cover',
           }}
           autoPlay
           playsInline
