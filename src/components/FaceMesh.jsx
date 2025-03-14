@@ -133,6 +133,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     const drawFaceMesh = (ctx, landmarks) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
+      // Draw face mesh with original opacity
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
         color: 'rgba(255, 255, 0, 0.15)',
         lineWidth: 1
@@ -143,7 +144,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const faceWidth = maxX - minX;
       const faceCenterX = minX + faceWidth / 2;
 
-      // Reduced scan speed
       const scanSpeed = 1.5;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
 
@@ -158,11 +158,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const currentScanY = minY + scanLineRef.current;
 
       if (currentScanY >= minY && currentScanY <= maxY) {
-        // Enhanced blur effect
-        ctx.filter = 'blur(25px)';
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = 'rgba(255, 255, 0, 0.5)';
-
         const curveHeight = 25;
         const controlPoints = [];
         const numPoints = 50;
@@ -177,7 +172,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           });
         }
 
-        // Draw main glow
+        // Draw scan line with reduced opacity
         ctx.beginPath();
         ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
         
@@ -187,29 +182,26 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           ctx.quadraticCurveTo(controlPoints[i].x, controlPoints[i].y, xc, yc);
         }
         
-        // Gradient effect for more natural light appearance
+        // Gradient with reduced opacity
         const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
         gradient.addColorStop(0, 'rgba(255, 255, 0, 0)');
-        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.8)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 1)');
-        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.8)');
+        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.1)'); // Reduced from 0.8
+        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.15)'); // Reduced from 1.0
+        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.1)'); // Reduced from 0.8
         gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
 
         ctx.strokeStyle = gradient;
         ctx.lineWidth = 8;
         ctx.stroke();
 
-        // Additional glow layers
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+        // Additional layers with reduced opacity
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.05)'; // Reduced from 0.3
         ctx.lineWidth = 15;
         ctx.stroke();
         
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.1)';
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.02)'; // Reduced from 0.1
         ctx.lineWidth = 25;
         ctx.stroke();
-
-        ctx.filter = 'none';
-        ctx.shadowBlur = 0;
       }
     };
 
