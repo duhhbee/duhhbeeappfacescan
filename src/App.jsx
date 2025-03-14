@@ -1,11 +1,29 @@
 import { FaceMeshMirror } from './components/FaceMesh';
+import { useState, useEffect } from 'react';
 
 const App = () => {
-  const windowWidth = window.innerWidth;
-  const windowHeight = window.innerHeight;
+  const [dimensions, setDimensions] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
-    <FaceMeshMirror windowWidth={windowWidth} windowHeight={windowHeight} />
+    <FaceMeshMirror 
+      windowWidth={dimensions.width} 
+      windowHeight={dimensions.height} 
+    />
   );
 };
 
