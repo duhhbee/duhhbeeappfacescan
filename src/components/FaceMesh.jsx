@@ -9,6 +9,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const scanLineRef = useRef(0);
   const scanDirectionRef = useRef(1);
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
+  const [videoConstraints, setVideoConstraints] = useState(null);
 
   const checkLighting = (landmarks) => {
     const avgBrightness = landmarks.reduce((sum, point) => sum + point.y, 0) / landmarks.length;
@@ -26,22 +27,60 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   };
 
   useEffect(() => {
+    const getVideoConstraints = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        const frontCamera = videoDevices.find(device => 
+          device.label.toLowerCase().includes('front') || 
+          device.label.toLowerCase().includes('user') ||
+          device.label.toLowerCase().includes('selfie')
+        );
+
+        const constraints = {
+          deviceId: frontCamera ? { exact: frontCamera.deviceId } : undefined,
+          facingMode: frontCamera ? undefined : { exact: 'user' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        };
+
+        setVideoConstraints(constraints);
+      } catch (error) {
+        console.error('Error getting video constraints:', error);
+        setVideoConstraints({
+          facingMode: { exact: 'user' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        });
+      }
+    };
+
+    getVideoConstraints();
+  }, []);
+
+  useEffect(() => {
     const calculateDimensions = () => {
       const isMobile = window.matchMedia("(max-width: 768px)").matches;
       let newWidth, newHeight;
 
       if (isMobile) {
-        // For mobile, use full viewport height and maintain aspect ratio
+        // For mobile, use a portrait-oriented container
         newHeight = windowHeight;
-        newWidth = (newHeight * 3) / 4; // 3:4 aspect ratio for portrait
+        newWidth = (windowHeight * 9) / 16; // 16:9 aspect ratio
+        
+        // If width exceeds window width, scale down proportionally
+        if (newWidth > windowWidth) {
+          newWidth = windowWidth;
+          newHeight = (windowWidth * 16) / 9;
+        }
       } else {
-        // For desktop, maintain 4:3 aspect ratio
-        if (windowWidth / windowHeight > 4/3) {
+        // For desktop, use landscape orientation
+        if (windowWidth / windowHeight > 16/9) {
           newHeight = windowHeight;
-          newWidth = (newHeight * 4) / 3;
+          newWidth = (windowHeight * 16) / 9;
         } else {
           newWidth = windowWidth;
-          newHeight = (newWidth * 3) / 4;
+          newHeight = (windowWidth * 9) / 16;
         }
       }
 
@@ -54,6 +93,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   }, [windowWidth, windowHeight]);
 
   useEffect(() => {
+    if (!videoConstraints) return;
+
     const videoElement = videoRef.current;
     const canvasElement = canvasRef.current;
     const canvasCtx = canvasElement.getContext('2d');
@@ -95,9 +136,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     const drawFaceMesh = (ctx, landmarks) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(255, 255, 0, 0.15)';
-      
+      // Draw face mesh
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
         color: 'rgba(255, 255, 0, 0.15)',
         lineWidth: 1
@@ -203,9 +242,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       onFrame: async () => {
         await faceMesh.send({ image: videoElement });
       },
-      width: dimensions.width,
-      height: dimensions.height,
-      facingMode: { exact: "user" }
+      ...videoConstraints
     });
 
     camera.start();
@@ -213,7 +250,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     return () => {
       camera.stop();
     };
-  }, [dimensions.width, dimensions.height]);
+  }, [dimensions.width, dimensions.height, videoConstraints]);
 
   return (
     <div
