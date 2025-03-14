@@ -134,7 +134,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(255, 255, 0, 0.15)',
+        color: 'rgba(255, 255, 0, 0.08)',
         lineWidth: 1
       });
 
@@ -143,7 +143,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const faceWidth = maxX - minX;
       const faceCenterX = minX + faceWidth / 2;
 
-      const scanSpeed = 1.5;
+      const scanSpeed = 1;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
 
       if (scanLineRef.current >= faceHeight) {
@@ -157,17 +157,11 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const currentScanY = minY + scanLineRef.current;
 
       if (currentScanY >= minY && currentScanY <= maxY) {
-        // iOS-optimized blur and glow effects
         ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
         
-        // Apply multiple composite operations for better iOS compatibility
-        ctx.globalCompositeOperation = 'screen';
-        
-        // Base glow layer with multiple passes
+        // Create multiple layers of glow using shadows
         for (let i = 0; i < 3; i++) {
-          ctx.filter = `blur(${15 + i * 10}px) saturate(150%)`;
-          ctx.globalAlpha = 0.3 - (i * 0.08);
-          
           const curveHeight = 30 - (i * 5);
           const controlPoints = [];
           const numPoints = 50;
@@ -191,21 +185,31 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             ctx.quadraticCurveTo(controlPoints[k].x, controlPoints[k].y, xc, yc);
           }
 
-          // Use multiple strokes with different widths for better iOS rendering
-          ctx.strokeStyle = `rgba(255, 255, 0, ${0.4 - (i * 0.1)})`;
-          ctx.lineWidth = 8 + (i * 4);
+          // Inner glow
+          ctx.shadowColor = 'rgba(255, 255, 0, 0.8)';
+          ctx.shadowBlur = 30 + (i * 15);
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.strokeStyle = `rgba(255, 255, 0, ${0.6 - (i * 0.15)})`;
+          ctx.lineWidth = 4 - i;
+          ctx.stroke();
+
+          // Outer glow
+          ctx.shadowColor = 'rgba(255, 255, 100, 0.4)';
+          ctx.shadowBlur = 50 + (i * 20);
+          ctx.strokeStyle = `rgba(255, 255, 100, ${0.3 - (i * 0.08)})`;
+          ctx.lineWidth = 2;
           ctx.stroke();
         }
 
-        // Additional bright center with iOS-optimized composite
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.filter = 'blur(8px) brightness(150%)';
-        ctx.globalAlpha = 0.4;
+        // Add central bright line
+        ctx.shadowColor = 'rgba(255, 255, 150, 0.9)';
+        ctx.shadowBlur = 15;
         ctx.beginPath();
         ctx.moveTo(minX, currentScanY);
         ctx.lineTo(maxX, currentScanY);
-        ctx.strokeStyle = 'rgba(255, 255, 100, 0.6)';
-        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(255, 255, 150, 0.9)';
+        ctx.lineWidth = 2;
         ctx.stroke();
 
         ctx.restore();
