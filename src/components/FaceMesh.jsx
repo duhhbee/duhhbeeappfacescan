@@ -133,9 +133,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     const drawFaceMesh = (ctx, landmarks) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
-      // Draw face mesh with very low opacity
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(255, 255, 0, 0.08)',
+        color: 'rgba(255, 255, 0, 0.15)',
         lineWidth: 1
       });
 
@@ -144,8 +143,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const faceWidth = maxX - minX;
       const faceCenterX = minX + faceWidth / 2;
 
-      // Slower scan speed for smoother movement
-      const scanSpeed = 1;
+      // Reduced scan speed
+      const scanSpeed = 1.5;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
 
       if (scanLineRef.current >= faceHeight) {
@@ -159,60 +158,58 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const currentScanY = minY + scanLineRef.current;
 
       if (currentScanY >= minY && currentScanY <= maxY) {
-        // Create multiple layers of blur for a more diffused effect
-        for (let i = 0; i < 3; i++) {
-          ctx.save();
-          ctx.filter = `blur(${60 + i * 20}px)`;  // Increased blur for each layer
-          ctx.globalAlpha = 0.3 - (i * 0.1);  // Decreasing opacity for each layer
-          
-          const curveHeight = 40 - (i * 10);  // Decreasing curve height for each layer
-          const controlPoints = [];
-          const numPoints = 50;
+        // Enhanced blur effect
+        ctx.filter = 'blur(25px)';
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = 'rgba(255, 255, 0, 0.5)';
 
-          for (let j = 0; j < numPoints; j++) {
-            const x = minX + (j / (numPoints - 1)) * faceWidth;
-            const distanceFromCenter = Math.abs(x - faceCenterX);
-            const curveOffset = Math.cos((distanceFromCenter / faceWidth) * Math.PI) * curveHeight;
-            controlPoints.push({
-              x: x,
-              y: currentScanY + curveOffset
-            });
-          }
+        const curveHeight = 25;
+        const controlPoints = [];
+        const numPoints = 50;
 
-          // Draw curved light beam with gradient
-          ctx.beginPath();
-          ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
-          
-          for (let k = 1; k < controlPoints.length - 2; k++) {
-            const xc = (controlPoints[k].x + controlPoints[k + 1].x) / 2;
-            const yc = (controlPoints[k].y + controlPoints[k + 1].y) / 2;
-            ctx.quadraticCurveTo(controlPoints[k].x, controlPoints[k].y, xc, yc);
-          }
-
-          // Create and apply gradient
-          const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
-          gradient.addColorStop(0, 'rgba(255, 255, 0, 0)');
-          gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.2)');
-          gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.3)');
-          gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.2)');
-          gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
-
-          ctx.strokeStyle = gradient;
-          ctx.lineWidth = 40 + (i * 20);  // Increasing line width for each layer
-          ctx.stroke();
-
-          ctx.restore();
+        for (let i = 0; i < numPoints; i++) {
+          const x = minX + (i / (numPoints - 1)) * faceWidth;
+          const distanceFromCenter = Math.abs(x - faceCenterX);
+          const curveOffset = Math.cos((distanceFromCenter / faceWidth) * Math.PI) * curveHeight;
+          controlPoints.push({
+            x: x,
+            y: currentScanY + curveOffset
+          });
         }
 
-        // Add a subtle glow effect
-        ctx.save();
-        ctx.filter = 'blur(80px)';
-        ctx.globalAlpha = 0.1;
+        // Draw main glow
         ctx.beginPath();
-        ctx.arc(faceCenterX, currentScanY, faceWidth * 0.3, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 0, 0.2)';
-        ctx.fill();
-        ctx.restore();
+        ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
+        
+        for (let i = 1; i < controlPoints.length - 2; i++) {
+          const xc = (controlPoints[i].x + controlPoints[i + 1].x) / 2;
+          const yc = (controlPoints[i].y + controlPoints[i + 1].y) / 2;
+          ctx.quadraticCurveTo(controlPoints[i].x, controlPoints[i].y, xc, yc);
+        }
+        
+        // Gradient effect for more natural light appearance
+        const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
+        gradient.addColorStop(0, 'rgba(255, 255, 0, 0)');
+        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.8)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 1)');
+        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.8)');
+        gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
+
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 8;
+        ctx.stroke();
+
+        // Additional glow layers
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+        ctx.lineWidth = 15;
+        ctx.stroke();
+        
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.1)';
+        ctx.lineWidth = 25;
+        ctx.stroke();
+
+        ctx.filter = 'none';
+        ctx.shadowBlur = 0;
       }
     };
 
