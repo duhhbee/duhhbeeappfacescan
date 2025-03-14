@@ -244,7 +244,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         image
       };
 
-      window.parent.postMessage(JSON.stringify(data), '*');
+      window.ReactNativeWebView.postMessage(JSON.stringify(data), '*');
       canvasCtx.restore();
     });
 
