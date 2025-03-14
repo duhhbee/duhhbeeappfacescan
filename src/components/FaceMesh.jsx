@@ -64,17 +64,14 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       let newWidth, newHeight;
 
       if (isMobile) {
-        // For mobile, use a portrait-oriented container
         newHeight = windowHeight;
-        newWidth = (windowHeight * 9) / 16; // 16:9 aspect ratio
+        newWidth = (windowHeight * 9) / 16;
         
-        // If width exceeds window width, scale down proportionally
         if (newWidth > windowWidth) {
           newWidth = windowWidth;
           newHeight = (windowWidth * 16) / 9;
         }
       } else {
-        // For desktop, use landscape orientation
         if (windowWidth / windowHeight > 16/9) {
           newHeight = windowHeight;
           newWidth = (windowHeight * 16) / 9;
@@ -136,7 +133,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     const drawFaceMesh = (ctx, landmarks) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
-      // Draw face mesh
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
         color: 'rgba(255, 255, 0, 0.15)',
         lineWidth: 1
@@ -147,7 +143,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const faceWidth = maxX - minX;
       const faceCenterX = minX + faceWidth / 2;
 
-      const scanSpeed = 4;
+      // Reduced scan speed
+      const scanSpeed = 1.5;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
 
       if (scanLineRef.current >= faceHeight) {
@@ -161,10 +158,12 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const currentScanY = minY + scanLineRef.current;
 
       if (currentScanY >= minY && currentScanY <= maxY) {
-        ctx.beginPath();
-        ctx.filter = 'blur(15px)';
+        // Enhanced blur effect
+        ctx.filter = 'blur(25px)';
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = 'rgba(255, 255, 0, 0.5)';
 
-        const curveHeight = 20;
+        const curveHeight = 25;
         const controlPoints = [];
         const numPoints = 50;
 
@@ -178,6 +177,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           });
         }
 
+        // Draw main glow
         ctx.beginPath();
         ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
         
@@ -187,19 +187,29 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           ctx.quadraticCurveTo(controlPoints[i].x, controlPoints[i].y, xc, yc);
         }
         
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
-        ctx.lineWidth = 4;
-        ctx.stroke();
+        // Gradient effect for more natural light appearance
+        const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
+        gradient.addColorStop(0, 'rgba(255, 255, 0, 0)');
+        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.8)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 1)');
+        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.8)');
+        gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
 
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
+        ctx.strokeStyle = gradient;
         ctx.lineWidth = 8;
         ctx.stroke();
+
+        // Additional glow layers
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+        ctx.lineWidth = 15;
+        ctx.stroke();
         
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.2)';
-        ctx.lineWidth = 12;
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.1)';
+        ctx.lineWidth = 25;
         ctx.stroke();
 
         ctx.filter = 'none';
+        ctx.shadowBlur = 0;
       }
     };
 
