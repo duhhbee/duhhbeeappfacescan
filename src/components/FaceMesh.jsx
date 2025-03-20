@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { FaceMesh, FACEMESH_TESSELATION } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
 import { drawConnectors } from '@mediapipe/drawing_utils';
+import overlayImage from '../assets/overlay.png';
 
 export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const videoRef = useRef(null);
@@ -141,8 +142,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
       const { minX, minY, maxX, maxY } = getFaceBoundingBox(landmarks);
       const faceHeight = maxY - minY;
-      const faceWidth = maxX - minX;
-      const faceCenterX = minX + faceWidth / 2;
+      const faceCenterX = minX + (maxX - minX) / 2;
 
       const scanSpeed = 1.5;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
@@ -163,9 +163,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         const numPoints = 50;
 
         for (let i = 0; i < numPoints; i++) {
-          const x = minX + (i / (numPoints - 1)) * faceWidth;
+          const x = minX + (i / (numPoints - 1)) * (maxX - minX);
           const distanceFromCenter = Math.abs(x - faceCenterX);
-          const curveOffset = Math.cos((distanceFromCenter / faceWidth) * Math.PI) * curveHeight;
+          const curveOffset = Math.cos((distanceFromCenter / (maxX - minX)) * Math.PI) * curveHeight;
           controlPoints.push({
             x: x,
             y: currentScanY + curveOffset
@@ -185,9 +185,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         // Gradient with reduced opacity
         const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
         gradient.addColorStop(0, 'rgba(255, 255, 0, 0)');
-        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.1)'); // Reduced from 0.8
-        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.15)'); // Reduced from 1.0
-        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.1)'); // Reduced from 0.8
+        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.1)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.15)');
+        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.1)');
         gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
 
         ctx.strokeStyle = gradient;
@@ -195,11 +195,11 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         ctx.stroke();
 
         // Additional layers with reduced opacity
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.05)'; // Reduced from 0.3
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.05)';
         ctx.lineWidth = 15;
         ctx.stroke();
         
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.02)'; // Reduced from 0.1
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.02)';
         ctx.lineWidth = 25;
         ctx.stroke();
       }
@@ -301,6 +301,19 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             width: '100%',
             height: '100%',
             transform: 'scaleX(-1)'
+          }}
+        />
+        <img
+          src={overlayImage}
+          alt="Overlay"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '50%',
+            height: 'auto',
+            pointerEvents: 'none'
           }}
         />
       </div>
