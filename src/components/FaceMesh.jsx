@@ -311,7 +311,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '80%', // Aumentado de 50% para 80%
+            width: '90%', // Aumentado de 80% para 90%
             height: 'auto',
             pointerEvents: 'none'
           }}
