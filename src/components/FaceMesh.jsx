@@ -197,9 +197,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         
         const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
         gradient.addColorStop(0, 'rgba(0, 153, 255, 0)');
-        gradient.addColorStop(0.2, 'rgba(0, 153, 255, 0.1)');
-        gradient.addColorStop(0.5, 'rgba(0, 153, 255, 0.15)');
-        gradient.addColorStop(0.8, 'rgba(0, 153, 255, 0.1)');
+        gradient.addColorStop(0.2, 'rgba(0, 153, 255, 0.5)');
+        gradient.addColorStop(0.5, 'rgba(0, 153, 255, 0.9)');
+        gradient.addColorStop(0.8, 'rgba(0, 153, 255, 0.5)');
         gradient.addColorStop(1, 'rgba(0, 153, 255, 0)');
 
         ctx.strokeStyle = gradient;
