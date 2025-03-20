@@ -134,10 +134,24 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     const drawFaceMesh = (ctx, landmarks) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
-      // Draw face mesh with original opacity
+      // Desenhar a malha facial em branco com menor opacidade
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(255, 255, 0, 0.15)',
+        color: 'rgba(255, 255, 255, 0.10)', // Reduzida para 15%
         lineWidth: 1
+      });
+
+      // Desenhar pontos de interseção mais brilhantes
+      landmarks.forEach(point => {
+        ctx.beginPath();
+        ctx.arc(
+          point.x * canvasElement.width,
+          point.y * canvasElement.height,
+          1.5, // Tamanho do ponto
+          0,
+          2 * Math.PI
+        );
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; // Aumentada para 90%
+        ctx.fill();
       });
 
       const { minX, minY, maxX, maxY } = getFaceBoundingBox(landmarks);
@@ -172,7 +186,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           });
         }
 
-        // Draw scan line with reduced opacity
         ctx.beginPath();
         ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
         
@@ -182,24 +195,22 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           ctx.quadraticCurveTo(controlPoints[i].x, controlPoints[i].y, xc, yc);
         }
         
-        // Gradient with reduced opacity
         const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
-        gradient.addColorStop(0, 'rgba(255, 255, 0, 0)');
-        gradient.addColorStop(0.2, 'rgba(255, 255, 0, 0.1)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.15)');
-        gradient.addColorStop(0.8, 'rgba(255, 255, 0, 0.1)');
-        gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
+        gradient.addColorStop(0, 'rgba(0, 153, 255, 0)');
+        gradient.addColorStop(0.2, 'rgba(0, 153, 255, 0.1)');
+        gradient.addColorStop(0.5, 'rgba(0, 153, 255, 0.15)');
+        gradient.addColorStop(0.8, 'rgba(0, 153, 255, 0.1)');
+        gradient.addColorStop(1, 'rgba(0, 153, 255, 0)');
 
         ctx.strokeStyle = gradient;
         ctx.lineWidth = 8;
         ctx.stroke();
 
-        // Additional layers with reduced opacity
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.05)';
+        ctx.strokeStyle = 'rgba(0, 153, 255, 0.05)';
         ctx.lineWidth = 15;
         ctx.stroke();
         
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.02)';
+        ctx.strokeStyle = 'rgba(0, 153, 255, 0.02)';
         ctx.lineWidth = 25;
         ctx.stroke();
       }
@@ -311,7 +322,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '90%', // Aumentado de 80% para 90%
+            width: '90%',
             height: 'auto',
             pointerEvents: 'none'
           }}
