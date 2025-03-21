@@ -3,14 +3,27 @@ import { FaceMesh, FACEMESH_TESSELATION } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
 import { drawConnectors } from '@mediapipe/drawing_utils';
 import overlayImage from '../assets/overlay.png';
+import linhaImage from '../assets/linha.png';
 
 export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const scanLineRef = useRef(0);
   const scanDirectionRef = useRef(1);
+  const opacityRef = useRef(0.8);
+  const opacityDirectionRef = useRef(1);
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
   const [videoConstraints, setVideoConstraints] = useState(null);
+  const scanLineImageRef = useRef(null);
+
+  useEffect(() => {
+    // Carregar a imagem da linha
+    const img = new Image();
+    img.src = linhaImage;
+    img.onload = () => {
+      scanLineImageRef.current = img;
+    };
+  }, []);
 
   const checkLighting = (landmarks) => {
     const avgBrightness = landmarks.reduce((sum, point) => sum + point.y, 0) / landmarks.length;
@@ -136,7 +149,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       
       // Desenhar a malha facial em branco com menor opacidade
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(255, 255, 255, 0.10)', // Reduzida para 15%
+        color: 'rgba(255, 255, 255, 0.10)',
         lineWidth: 1
       });
 
@@ -146,17 +159,16 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         ctx.arc(
           point.x * canvasElement.width,
           point.y * canvasElement.height,
-          1.5, // Tamanho do ponto
+          1.5,
           0,
           2 * Math.PI
         );
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; // Aumentada para 90%
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.fill();
       });
 
       const { minX, minY, maxX, maxY } = getFaceBoundingBox(landmarks);
       const faceHeight = maxY - minY;
-      const faceCenterX = minX + (maxX - minX) / 2;
 
       const scanSpeed = 1.5;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
@@ -169,50 +181,39 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         scanLineRef.current = 0;
       }
 
+      // Atualizar opacidade
+      const opacitySpeed = 0.03;
+      opacityRef.current += opacitySpeed * opacityDirectionRef.current;
+
+      if (opacityRef.current >= 1) {
+        opacityDirectionRef.current = -1;
+        opacityRef.current = 1;
+      } else if (opacityRef.current <= 0.8) {
+        opacityDirectionRef.current = 1;
+        opacityRef.current = 0.8;
+      }
+
       const currentScanY = minY + scanLineRef.current;
 
-      if (currentScanY >= minY && currentScanY <= maxY) {
-        const curveHeight = 25;
-        const controlPoints = [];
-        const numPoints = 50;
-
-        for (let i = 0; i < numPoints; i++) {
-          const x = minX + (i / (numPoints - 1)) * (maxX - minX);
-          const distanceFromCenter = Math.abs(x - faceCenterX);
-          const curveOffset = Math.cos((distanceFromCenter / (maxX - minX)) * Math.PI) * curveHeight;
-          controlPoints.push({
-            x: x,
-            y: currentScanY + curveOffset
-          });
-        }
-
-        ctx.beginPath();
-        ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
+      // Desenhar a imagem da linha de scan
+      if (currentScanY >= minY && currentScanY <= maxY && scanLineImageRef.current) {
+        ctx.save();
+        const lineWidth = (maxX - minX) * 1.2; // Aumentar a largura em 20%
+        const lineHeight = scanLineImageRef.current.height * (lineWidth / scanLineImageRef.current.width);
         
-        for (let i = 1; i < controlPoints.length - 2; i++) {
-          const xc = (controlPoints[i].x + controlPoints[i + 1].x) / 2;
-          const yc = (controlPoints[i].y + controlPoints[i + 1].y) / 2;
-          ctx.quadraticCurveTo(controlPoints[i].x, controlPoints[i].y, xc, yc);
-        }
+        // Definir opacidade global com efeito de pulsação
+        ctx.globalAlpha = opacityRef.current;
         
-        const gradient = ctx.createLinearGradient(minX, currentScanY, maxX, currentScanY);
-        gradient.addColorStop(0, 'rgba(0, 153, 255, 0)');
-        gradient.addColorStop(0.2, 'rgba(0, 153, 255, 0.5)');
-        gradient.addColorStop(0.5, 'rgba(0, 153, 255, 0.9)');
-        gradient.addColorStop(0.8, 'rgba(0, 153, 255, 0.5)');
-        gradient.addColorStop(1, 'rgba(0, 153, 255, 0)');
-
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = 8;
-        ctx.stroke();
-
-        ctx.strokeStyle = 'rgba(0, 153, 255, 0.05)';
-        ctx.lineWidth = 15;
-        ctx.stroke();
+        // Desenhar a imagem da linha
+        ctx.drawImage(
+          scanLineImageRef.current,
+          minX - (lineWidth - (maxX - minX)) / 2, // Centralizar a linha aumentada
+          currentScanY - lineHeight / 2,
+          lineWidth,
+          lineHeight
+        );
         
-        ctx.strokeStyle = 'rgba(0, 153, 255, 0.02)';
-        ctx.lineWidth = 25;
-        ctx.stroke();
+        ctx.restore();
       }
     };
 
