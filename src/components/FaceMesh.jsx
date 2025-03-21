@@ -267,15 +267,13 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
       const lighting = checkLighting(landmarks);
       const position = checkPosition(landmarks);
+      const faceFound = lighting && position;
       
-      // 🔍 log para debug!
       console.log('[DEBUG] lighting:', lighting);
       console.log('[DEBUG] position:', position);
+      console.log('[DEBUG] faceFound:', faceFound);
       
-      // Isso ainda está forçando sempre true
-      const faceFound = true; 
-      
-      const image = (lighting && position) ? captureImage(canvasElement) : null;
+      const image = faceFound ? captureImage(canvasElement) : null;
       
       const data = {
         faceFound,
