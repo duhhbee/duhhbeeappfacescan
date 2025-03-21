@@ -248,8 +248,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           position: false,
           image: null
         };
-        
-        window.parent.postMessage(JSON.stringify(data), '*');
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify(data));
+        }
         return;
       }
 
@@ -276,7 +277,10 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         image
       };
 
-      window.parent.postMessage(JSON.stringify(data), '*');
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(data));
+      }
+
       canvasCtx.restore();
     });
 
