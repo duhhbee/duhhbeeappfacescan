@@ -4,6 +4,7 @@ import { Camera } from '@mediapipe/camera_utils';
 import { drawConnectors } from '@mediapipe/drawing_utils';
 import overlayImage from '../assets/overlay.png';
 import linhaImage from '../assets/linha.png';
+import scanAudio from '../assets/duhhbeeaudioscan.mp3';
 
 export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const videoRef = useRef(null);
@@ -15,6 +16,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
   const [videoConstraints, setVideoConstraints] = useState(null);
   const scanLineImageRef = useRef(null);
+  const audioRef = useRef(null);
 
   useEffect(() => {
     // Carregar a imagem da linha
@@ -22,6 +24,20 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     img.src = linhaImage;
     img.onload = () => {
       scanLineImageRef.current = img;
+    };
+
+    // Configurar o áudio
+    const audio = new Audio(scanAudio);
+    audio.loop = true;
+    audio.volume = 0.5; // Volume em 50%
+    audioRef.current = audio;
+
+    // Iniciar o áudio quando a face for detectada
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
     };
   }, []);
 
@@ -221,6 +237,11 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       if (!results.multiFaceLandmarks || !results.multiFaceLandmarks.length) {
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
         
+        // Pausar o áudio quando não houver face detectada
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        
         const data = {
           faceFound: false,
           lighting: false,
@@ -230,6 +251,13 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         
         window.parent.postMessage(JSON.stringify(data), '*');
         return;
+      }
+
+      // Iniciar ou retomar o áudio quando uma face for detectada
+      if (audioRef.current && audioRef.current.paused) {
+        audioRef.current.play().catch(error => {
+          console.log('Erro ao reproduzir áudio:', error);
+        });
       }
 
       canvasCtx.save();
