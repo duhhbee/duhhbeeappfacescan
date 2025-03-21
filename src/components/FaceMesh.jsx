@@ -267,19 +267,29 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
       const lighting = checkLighting(landmarks);
       const position = checkPosition(landmarks);
-      const faceFound = true;
+      
+      // 🔍 log para debug!
+      console.log('[DEBUG] lighting:', lighting);
+      console.log('[DEBUG] position:', position);
+      
+      // Isso ainda está forçando sempre true
+      const faceFound = true; 
+      
       const image = (lighting && position) ? captureImage(canvasElement) : null;
-
+      
       const data = {
         faceFound,
         lighting,
         position,
         image
       };
-
+      
+      console.log('[DEBUG] Enviando para o app:', data);
+      
       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
         window.ReactNativeWebView.postMessage(JSON.stringify(data));
       }
+
 
       canvasCtx.restore();
     });
