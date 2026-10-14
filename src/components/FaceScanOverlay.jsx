@@ -90,13 +90,13 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
 
       {corners.map((c, i) => (
         <g key={i} transform={`translate(${c.x} ${c.y}) scale(${c.sx} ${c.sy})`}>
-          <path
+          {/* <path
             d={`M 0 0 L 0 ${arm} M 0 0 L ${arm} 0`}
             fill="none"
             stroke={GOLD}
             strokeWidth={5}
             strokeLinecap="round"
-          />
+          /> */}
         </g>
       ))}
     </svg>

@@ -53,11 +53,12 @@ export const isCenteredInFrame = (landmarks, loose = false) => {
   return centerX > 0.28 && centerX < 0.72 && centerY > 0.34 && centerY < 0.78;
 };
 
+/** Selfie preview is mirrored — user "left" matches positive yaw here. */
 const poseYawOk = (pose, yawDeg, t) => {
   const y = yawDeg;
   if (pose === 'center') return Math.abs(y) <= t.maxYawDegCenter;
-  if (pose === 'left') return y <= -t.minSideYawDeg && Math.abs(y) <= t.maxYawDegSide;
-  if (pose === 'right') return y >= t.minSideYawDeg && Math.abs(y) <= t.maxYawDegSide;
+  if (pose === 'left') return y >= t.minSideYawDeg && Math.abs(y) <= t.maxYawDegSide;
+  if (pose === 'right') return y <= -t.minSideYawDeg && Math.abs(y) <= t.maxYawDegSide;
   return Math.abs(y) <= t.maxYawDegCenter;
 };
 
