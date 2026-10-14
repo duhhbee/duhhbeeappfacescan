@@ -10,11 +10,12 @@ export const QUALITY_THRESHOLDS = {
   minFaceWidthNorm: 0.26,
   maxFaceWidthNorm: 0.82,
   maxYawDegCenter: 18,
-  maxYawDegSide: 45,
+  minSideYawDeg: 14,
+  maxYawDegSide: 48,
   minMeanLuma: 45,
   maxMeanLuma: 220,
   maxLightAsymmetryRatio: 1.45,
-  minBlurVariance: 85,
+  minBlurVariance: 90,
 };
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
@@ -43,10 +44,21 @@ export const estimateYawDeg = (landmarks) => {
   return clamp(Math.asin(clamp(offset, -1, 1)) * (180 / Math.PI), -90, 90);
 };
 
-export const isCenteredInFrame = (landmarks) => {
+export const isCenteredInFrame = (landmarks, loose = false) => {
   const centerX = landmarks.reduce((sum, p) => sum + p.x, 0) / landmarks.length;
   const centerY = landmarks.reduce((sum, p) => sum + p.y, 0) / landmarks.length;
+  if (loose) {
+    return centerX > 0.22 && centerX < 0.78 && centerY > 0.22 && centerY < 0.78;
+  }
   return centerX > 0.3 && centerX < 0.7 && centerY > 0.28 && centerY < 0.72;
+};
+
+const poseYawOk = (pose, yawDeg, t) => {
+  const y = yawDeg;
+  if (pose === 'center') return Math.abs(y) <= t.maxYawDegCenter;
+  if (pose === 'left') return y <= -t.minSideYawDeg && Math.abs(y) <= t.maxYawDegSide;
+  if (pose === 'right') return y >= t.minSideYawDeg && Math.abs(y) <= t.maxYawDegSide;
+  return Math.abs(y) <= t.maxYawDegCenter;
 };
 
 let sampleCanvas = null;
@@ -173,7 +185,7 @@ export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight)
   else if (meanLuma > t.maxMeanLuma) rejectReason = 'too_bright';
   else if (asymmetryRatio > t.maxLightAsymmetryRatio) rejectReason = 'uneven_light';
   else if (blurVariance < t.minBlurVariance) rejectReason = 'blurry';
-  else if (Math.abs(yawDeg) > t.maxYawDegCenter) rejectReason = 'head_angle';
+  else if (!poseYawOk(pose, yawDeg, t)) rejectReason = 'head_angle';
 
   const lighting =
     meanLuma >= t.minMeanLuma &&
@@ -181,7 +193,8 @@ export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight)
     asymmetryRatio <= t.maxLightAsymmetryRatio;
 
   const qualityOk = rejectReason === null;
-  const position = centered && qualityOk;
+  const inFrame = pose === 'center' ? centered : isCenteredInFrame(landmarks, true);
+  const position = inFrame && qualityOk;
 
   const faceFound =
     !!landmarks?.length &&

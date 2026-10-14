@@ -220,9 +220,11 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         ctx.save();
         const lineWidth = (maxX - minX) * 1.15;
         const left = minX - (lineWidth - (maxX - minX)) / 2;
-        ctx.globalAlpha = 0.55 + opacityRef.current * 0.35;
-        ctx.strokeStyle = '#F5C400';
-        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.5 + opacityRef.current * 0.4;
+        ctx.strokeStyle = '#2EE6D6';
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = '#2EE6D6';
+        ctx.shadowBlur = 6;
         ctx.beginPath();
         ctx.moveTo(left, currentScanY);
         ctx.lineTo(left + lineWidth, currentScanY);
