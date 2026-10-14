@@ -4,6 +4,7 @@ import { Camera } from '@mediapipe/camera_utils';
 import { drawConnectors } from '@mediapipe/drawing_utils';
 import linhaImage from '../assets/linha.png';
 import { FaceScanOverlay } from './FaceScanOverlay';
+import { ScannerChrome } from './ScannerChrome';
 import scanAudio from '../assets/duhhbeeaudioscan.mp3';
 import { evaluateFaceQuality } from '../faceQuality';
 
@@ -15,6 +16,12 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const opacityRef = useRef(0.8);
   const opacityDirectionRef = useRef(1);
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
+  const [scanUi, setScanUi] = useState({
+    faceFound: false,
+    lighting: false,
+    qualityOk: false,
+    rejectReason: 'no_face',
+  });
   const [videoConstraints, setVideoConstraints] = useState(null);
   const scanLineImageRef = useRef(null);
   const audioRef = useRef(null);
@@ -171,8 +178,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       
       // Desenhar a malha facial em branco com menor opacidade
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(245, 196, 0, 0.12)',
-        lineWidth: 0.8
+        color: 'rgba(255, 255, 255, 0.06)',
+        lineWidth: 0.6
       });
 
       // Desenhar pontos de interseção mais brilhantes
@@ -185,7 +192,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           0,
           2 * Math.PI
         );
-        ctx.fillStyle = 'rgba(245, 196, 0, 0.35)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
         ctx.fill();
       });
 
@@ -248,7 +255,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           audioRef.current.pause();
         }
         
-        postToApp({
+        const empty = {
           faceFound: false,
           lighting: false,
           position: false,
@@ -256,7 +263,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           qualityOk: false,
           rejectReason: 'no_face',
           image: null,
-        });
+        };
+        setScanUi(empty);
+        postToApp(empty);
         return;
       }
 
@@ -281,7 +290,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const ready = quality.qualityOk;
       const image = ready ? captureImage(canvasElement) : null;
 
-      postToApp({
+      const payload = {
         faceFound: quality.faceFound,
         lighting: quality.lighting,
         position: quality.position,
@@ -290,7 +299,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         rejectReason: quality.rejectReason,
         metrics: quality.metrics,
         image,
-      });
+      };
+      setScanUi({ ...payload, faceFound: true });
+      postToApp(payload);
 
 
       canvasCtx.restore();
@@ -354,7 +365,12 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             transform: 'scaleX(-1)'
           }}
         />
-        <FaceScanOverlay width={dimensions.width} height={dimensions.height} />
+        <FaceScanOverlay
+          width={dimensions.width}
+          height={dimensions.height}
+          ready={scanUi.qualityOk}
+        />
+        <ScannerChrome scan={scanUi} />
       </div>
     </div>
   );

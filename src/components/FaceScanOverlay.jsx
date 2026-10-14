@@ -1,12 +1,10 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 
-const GOLD = '#F5C400';
+const ACCENT = '#F5C400';
+const LINE = 'rgba(255, 255, 255, 0.88)';
 
-/**
- * Face scanner frame — 100% frontend (WebView). Not from backend.
- * Vignette + oval + corner brackets; sizes track the video container.
- */
-export const FaceScanOverlay = ({ width, height }) => {
+/** Minimal modern scanner frame — thin lines, soft vignette. */
+export const FaceScanOverlay = ({ width, height, ready = false }) => {
   const uid = useId().replace(/:/g, '');
   const [scanT, setScanT] = useState(0);
 
@@ -14,7 +12,7 @@ export const FaceScanOverlay = ({ width, height }) => {
     let frame;
     let t = 0;
     const tick = () => {
-      t += 0.008;
+      t += 0.006;
       setScanT(t);
       frame = requestAnimationFrame(tick);
     };
@@ -26,20 +24,18 @@ export const FaceScanOverlay = ({ width, height }) => {
     const w = width || 360;
     const h = height || 640;
     const cx = w / 2;
-    const cy = h * 0.42;
-    const rx = Math.min(w * 0.38, h * 0.26);
-    const ry = h * 0.3;
-    const cornerLen = Math.min(w, h) * 0.07;
-    const cornerStroke = Math.max(3, Math.min(w, h) * 0.008);
-
+    const cy = h * 0.4;
+    const rx = Math.min(w * 0.34, h * 0.24);
+    const ry = h * 0.285;
     const scanY = cy - ry + (Math.sin(scanT) * 0.5 + 0.5) * (ry * 2);
-
-    return { w, h, cx, cy, rx, ry, cornerLen, cornerStroke, scanY };
+    const tick = Math.min(w, h) * 0.055;
+    return { w, h, cx, cy, rx, ry, scanY, tick };
   }, [width, height, scanT]);
 
-  const { w, h, cx, cy, rx, ry, cornerLen, cornerStroke, scanY } = geom;
-  const maskId = `faceHole-${uid}`;
-  const clipId = `ovalClip-${uid}`;
+  const { w, h, cx, cy, rx, ry, scanY, tick } = geom;
+  const maskId = `hole-${uid}`;
+  const clipId = `clip-${uid}`;
+  const stroke = ready ? ACCENT : LINE;
 
   const corners = [
     { x: cx - rx, y: cy - ry, sx: 1, sy: 1 },
@@ -48,89 +44,64 @@ export const FaceScanOverlay = ({ width, height }) => {
     { x: cx + rx, y: cy + ry, sx: -1, sy: -1 },
   ];
 
-  const bracket = (len, sw) =>
-    `M 0 0 L 0 ${len} L ${sw} ${len} L ${sw} ${sw} L ${len} ${sw} L ${len} 0 Z`;
-
   return (
-    <>
-      <style>{`
-        @keyframes scannerPulse-${uid} {
-          0%, 100% { opacity: 0.65; }
-          50% { opacity: 1; }
-        }
-        .scanner-oval-${uid} {
-          animation: scannerPulse-${uid} 2.4s ease-in-out infinite;
-        }
-      `}</style>
-      <svg
-        viewBox={`0 0 ${w} ${h}`}
-        width={w}
-        height={h}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          pointerEvents: 'none',
-        }}
-        aria-hidden
-      >
-        <defs>
-          <mask id={maskId}>
-            <rect width={w} height={h} fill="white" />
-            <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="black" />
-          </mask>
-          <linearGradient id={`scanBeam-${uid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={GOLD} stopOpacity="0" />
-            <stop offset="50%" stopColor={GOLD} stopOpacity="0.55" />
-            <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
-          </linearGradient>
-          <clipPath id={clipId}>
-            <ellipse cx={cx} cy={cy} rx={rx - 2} ry={ry - 2} />
-          </clipPath>
-          <filter id={`glow-${uid}`} x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="2" result="b" />
-            <feMerge>
-              <feMergeNode in="b" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      width={w}
+      height={h}
+      style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+      aria-hidden
+    >
+      <defs>
+        <mask id={maskId}>
+          <rect width={w} height={h} fill="white" />
+          <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="black" />
+        </mask>
+        <linearGradient id={`beam-${uid}`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={ACCENT} stopOpacity="0" />
+          <stop offset="50%" stopColor={ACCENT} stopOpacity="0.75" />
+          <stop offset="100%" stopColor={ACCENT} stopOpacity="0" />
+        </linearGradient>
+        <clipPath id={clipId}>
+          <ellipse cx={cx} cy={cy} rx={rx - 1} ry={ry - 1} />
+        </clipPath>
+      </defs>
 
-        <rect width={w} height={h} fill="rgba(0,0,0,0.48)" mask={`url(#${maskId})`} />
+      <rect width={w} height={h} fill="rgba(0,0,0,0.5)" mask={`url(#${maskId})`} />
 
-        <ellipse
-          className={`scanner-oval-${uid}`}
-          cx={cx}
-          cy={cy}
-          rx={rx}
-          ry={ry}
-          fill="none"
-          stroke={GOLD}
-          strokeWidth={2}
-          opacity={0.95}
+      <ellipse
+        cx={cx}
+        cy={cy}
+        rx={rx}
+        ry={ry}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={1.5}
+        opacity={ready ? 1 : 0.75}
+      />
+
+      <g clipPath={`url(#${clipId})`} opacity={0.85}>
+        <line
+          x1={cx - rx}
+          x2={cx + rx}
+          y1={scanY}
+          y2={scanY}
+          stroke={`url(#beam-${uid})`}
+          strokeWidth={1.5}
         />
+      </g>
 
-        <g clipPath={`url(#${clipId})`} opacity={0.55}>
-          <line
-            x1={cx - rx}
-            x2={cx + rx}
-            y1={scanY}
-            y2={scanY}
-            stroke={`url(#scanBeam-${uid})`}
-            strokeWidth={2}
+      {corners.map((c, i) => (
+        <g key={i} transform={`translate(${c.x} ${c.y}) scale(${c.sx} ${c.sy})`}>
+          <path
+            d={`M 0 0 L 0 ${tick} M 0 0 L ${tick} 0`}
+            fill="none"
+            stroke={ACCENT}
+            strokeWidth={2.5}
+            strokeLinecap="round"
           />
         </g>
-
-        {corners.map((c, i) => (
-          <g
-            key={i}
-            transform={`translate(${c.x} ${c.y}) scale(${c.sx} ${c.sy})`}
-            filter={`url(#glow-${uid})`}
-          >
-            <path d={bracket(cornerLen, cornerStroke)} fill={GOLD} />
-          </g>
-        ))}
-      </svg>
-    </>
+      ))}
+    </svg>
   );
 };
