@@ -20,6 +20,13 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const lastPostRef = useRef({ at: 0, key: '' });
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (window.__duhhGuideTopPad == null) window.__duhhGuideTopPad = 0.11;
+      if (window.__duhhGuideBottomPad == null) window.__duhhGuideBottomPad = 0.3;
+    }
+  }, []);
+
+  useEffect(() => {
     const audio = new Audio(scanAudio);
     audio.loop = true;
     audio.volume = 0.5;

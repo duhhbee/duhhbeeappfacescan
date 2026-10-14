@@ -50,7 +50,7 @@ export const isCenteredInFrame = (landmarks, loose = false) => {
   if (loose) {
     return centerX > 0.22 && centerX < 0.78 && centerY > 0.22 && centerY < 0.78;
   }
-  return centerX > 0.3 && centerX < 0.7 && centerY > 0.28 && centerY < 0.72;
+  return centerX > 0.28 && centerX < 0.72 && centerY > 0.34 && centerY < 0.78;
 };
 
 const poseYawOk = (pose, yawDeg, t) => {

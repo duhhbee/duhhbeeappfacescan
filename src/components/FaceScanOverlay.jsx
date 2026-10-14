@@ -1,28 +1,44 @@
-import { useId, useMemo } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 const GOLD = '#F5C400';
 
 /** Mockup-style guide: yellow corners, dashed oval, crosshair. */
-export const FaceScanOverlay = ({ width, height, ready = false }) => {
-  const uid = useId().replace(/:/g, '');
-
-  const geom = useMemo(() => {
+const readGuideGeom = (width, height, _guideTick = 0) => {
     const w = width || 360;
     const h = height || 640;
     const cx = w / 2;
-    const cy = h * 0.42;
-    const boxW = w * 0.82;
-    const boxH = h * 0.54;
+    const topPad =
+      typeof window !== 'undefined' && window.__duhhGuideTopPad != null
+        ? Number(window.__duhhGuideTopPad)
+        : 0.11;
+    const bottomPad =
+      typeof window !== 'undefined' && window.__duhhGuideBottomPad != null
+        ? Number(window.__duhhGuideBottomPad)
+        : 0.3;
+    const bandTop = h * (Number.isFinite(topPad) ? topPad : 0.11);
+    const bandH = h * (1 - (topPad || 0.11) - (bottomPad || 0.3));
+    const cy = bandTop + bandH * 0.5;
+    const boxW = w * 0.88;
+    const boxH = Math.max(bandH * 0.88, h * 0.32);
     const x = cx - boxW / 2;
     const y = cy - boxH / 2;
     const r = Math.min(boxW, boxH) * 0.1;
     const arm = Math.min(w, h) * 0.065;
     const rx = boxW * 0.36;
     const ry = boxH * 0.42;
-    return { w, h, cx, cy, x, y, boxW, boxH, r, arm, rx, ry, ready };
-  }, [width, height, ready]);
+    return { w, h, cx, cy, x, y, boxW, boxH, r, arm, rx, ry };
+};
 
-  const { w, h, cx, cy, x, y, boxW, boxH, r, arm, rx, ry } = geom;
+export const FaceScanOverlay = ({ width, height, ready = false }) => {
+  const uid = useId().replace(/:/g, '');
+  const [guideTick, setGuideTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setGuideTick((t) => t + 1), 400);
+    return () => clearInterval(id);
+  }, []);
+
+  const { w, h, cx, cy, x, y, boxW, boxH, r, arm, rx, ry } = readGuideGeom(width, height, guideTick);
   const maskId = `mask-${uid}`;
   const framePath = `M ${x + r} ${y} H ${x + boxW - r} A ${r} ${r} 0 0 1 ${x + boxW} ${y + r} V ${y + boxH - r} A ${r} ${r} 0 0 1 ${x + boxW - r} ${y + boxH} H ${x + r} A ${r} ${r} 0 0 1 ${x} ${y + boxH - r} V ${y + r} A ${r} ${r} 0 0 1 ${x + r} ${y} Z`;
 
