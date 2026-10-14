@@ -1,8 +1,29 @@
-# React + Vite
+# DuhhBee face scan (WebView)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Vite + React app loaded inside the DuhhBee mobile app WebView for register face scanning (MediaPipe face mesh, quality gates, yellow frame overlay).
 
-Currently, two official plugins are available:
+## Scripts
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm install
+npm run dev      # local dev server
+npm run build    # production bundle → dist/
+```
+
+## Deploy
+
+Ship `dist/` to Vercel (or similar) and set the app env:
+
+`EXPO_PUBLIC_FACESCAN_URL=https://your-deployment.vercel.app`
+
+See **duhhbee-app** `docs/FACESCAN_DEPLOY.md` for HTTPS on device, pose injection contract, and QA checklist.
+
+## Key files
+
+| File | Role |
+|------|------|
+| `src/faceQuality.js` | Lighting, blur, yaw pose checks (center / left / right) |
+| `src/components/FaceMesh.jsx` | Camera + mesh + postMessage to RN |
+| `src/components/FaceScanOverlay.jsx` | Yellow guide frame |
+
+Pose is set by the app: `window.__duhhPose = 'center' | 'left' | 'right'`.

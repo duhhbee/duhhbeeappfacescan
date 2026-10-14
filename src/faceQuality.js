@@ -8,15 +8,22 @@ const LM = {
 
 export const QUALITY_THRESHOLDS = {
   minFaceWidthNorm: 0.26,
+  minFaceWidthNormSide: 0.22,
   maxFaceWidthNorm: 0.82,
   maxYawDegCenter: 18,
-  minSideYawDeg: 14,
+  minSideYawDeg: 11,
   maxYawDegSide: 48,
   minMeanLuma: 45,
   maxMeanLuma: 220,
   maxLightAsymmetryRatio: 1.45,
+  maxLightAsymmetryRatioSide: 2.0,
   minBlurVariance: 90,
+  minBlurVarianceSide: 72,
 };
+
+const YAW_SMOOTH_FRAMES = 6;
+const yawHistory = [];
+let yawSmoothPose = 'center';
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
@@ -44,6 +51,16 @@ export const estimateYawDeg = (landmarks) => {
   return clamp(Math.asin(clamp(offset, -1, 1)) * (180 / Math.PI), -90, 90);
 };
 
+const smoothYawDeg = (rawYaw, pose) => {
+  if (pose !== yawSmoothPose) {
+    yawSmoothPose = pose;
+    yawHistory.length = 0;
+  }
+  yawHistory.push(rawYaw);
+  if (yawHistory.length > YAW_SMOOTH_FRAMES) yawHistory.shift();
+  return yawHistory.reduce((sum, v) => sum + v, 0) / yawHistory.length;
+};
+
 export const isCenteredInFrame = (landmarks, loose = false) => {
   const centerX = landmarks.reduce((sum, p) => sum + p.x, 0) / landmarks.length;
   const centerY = landmarks.reduce((sum, p) => sum + p.y, 0) / landmarks.length;
@@ -51,6 +68,18 @@ export const isCenteredInFrame = (landmarks, loose = false) => {
     return centerX > 0.22 && centerX < 0.78 && centerY > 0.22 && centerY < 0.78;
   }
   return centerX > 0.28 && centerX < 0.72 && centerY > 0.34 && centerY < 0.78;
+};
+
+/** Side poses: allow face centroid to shift toward the turn direction. */
+export const isCenteredInFrameForPose = (landmarks, pose) => {
+  if (pose === 'center') return isCenteredInFrame(landmarks, false);
+
+  const centerX = landmarks.reduce((sum, p) => sum + p.x, 0) / landmarks.length;
+  const centerY = landmarks.reduce((sum, p) => sum + p.y, 0) / landmarks.length;
+  const shift = pose === 'left' ? 0.06 : pose === 'right' ? -0.06 : 0;
+  const adjX = centerX - shift;
+
+  return adjX > 0.18 && adjX < 0.82 && centerY > 0.2 && centerY < 0.82;
 };
 
 /** Selfie preview is mirrored — user "left" matches positive yaw here. */
@@ -159,6 +188,8 @@ const readPose = () => {
   return 'center';
 };
 
+const isSidePose = (pose) => pose === 'left' || pose === 'right';
+
 /**
  * @returns {{
  *   lighting: boolean,
@@ -172,34 +203,39 @@ const readPose = () => {
 export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight) => {
   const t = QUALITY_THRESHOLDS;
   const widthNorm = faceWidthNorm(landmarks);
-  const yawDeg = estimateYawDeg(landmarks);
-  const centered = isCenteredInFrame(landmarks);
+  const pose = readPose();
+  const side = isSidePose(pose);
+  const rawYaw = estimateYawDeg(landmarks);
+  const yawDeg = smoothYawDeg(rawYaw, pose);
   const { meanLuma, asymmetryRatio } = sampleFaceLighting(video, landmarks, canvasWidth, canvasHeight);
   const blurVariance = estimateBlurVariance(video);
-  const pose = readPose();
+
+  const minWidth = side ? t.minFaceWidthNormSide : t.minFaceWidthNorm;
+  const maxAsymmetry = side ? t.maxLightAsymmetryRatioSide : t.maxLightAsymmetryRatio;
+  const minBlur = side ? t.minBlurVarianceSide : t.minBlurVariance;
 
   let rejectReason = null;
 
-  if (widthNorm < t.minFaceWidthNorm) rejectReason = 'too_far';
+  if (widthNorm < minWidth) rejectReason = 'too_far';
   else if (widthNorm > t.maxFaceWidthNorm) rejectReason = 'too_close';
   else if (meanLuma < t.minMeanLuma) rejectReason = 'too_dark';
   else if (meanLuma > t.maxMeanLuma) rejectReason = 'too_bright';
-  else if (asymmetryRatio > t.maxLightAsymmetryRatio) rejectReason = 'uneven_light';
-  else if (blurVariance < t.minBlurVariance) rejectReason = 'blurry';
+  else if (asymmetryRatio > maxAsymmetry) rejectReason = 'uneven_light';
+  else if (blurVariance < minBlur) rejectReason = 'blurry';
   else if (!poseYawOk(pose, yawDeg, t)) rejectReason = 'head_angle';
 
   const lighting =
     meanLuma >= t.minMeanLuma &&
     meanLuma <= t.maxMeanLuma &&
-    asymmetryRatio <= t.maxLightAsymmetryRatio;
+    asymmetryRatio <= maxAsymmetry;
 
   const qualityOk = rejectReason === null;
-  const inFrame = pose === 'center' ? centered : isCenteredInFrame(landmarks, true);
+  const inFrame = isCenteredInFrameForPose(landmarks, pose);
   const position = inFrame && qualityOk;
 
   const faceFound =
     !!landmarks?.length &&
-    widthNorm >= t.minFaceWidthNorm * 0.75 &&
+    widthNorm >= minWidth * 0.75 &&
     meanLuma >= t.minMeanLuma * 0.65;
 
   return {
@@ -212,6 +248,7 @@ export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight)
     metrics: {
       faceWidthNorm: Number(widthNorm.toFixed(3)),
       yawDeg: Number(yawDeg.toFixed(1)),
+      rawYawDeg: Number(rawYaw.toFixed(1)),
       meanLuma: Number(meanLuma.toFixed(1)),
       lightAsymmetry: Number(asymmetryRatio.toFixed(2)),
       blurVariance: Number(blurVariance.toFixed(1)),
