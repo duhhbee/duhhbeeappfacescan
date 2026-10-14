@@ -2,6 +2,18 @@ import { useEffect, useId, useState } from 'react';
 
 const GOLD = '#F5C400';
 
+const POSE_UI = {
+  center: { title: 'CENTER', hint: 'Look straight at camera' },
+  left: { title: 'TURN LEFT', hint: 'Left cheek toward camera' },
+  right: { title: 'TURN RIGHT', hint: 'Right cheek toward camera' },
+};
+
+const readPose = () => {
+  const p = typeof window !== 'undefined' ? window.__duhhPose : undefined;
+  if (p === 'left' || p === 'right' || p === 'center') return p;
+  return 'center';
+};
+
 /** Mockup-style guide: yellow corners, dashed oval, crosshair. */
 const readGuideGeom = (width, height, _guideTick = 0) => {
     const w = width || 360;
@@ -36,9 +48,13 @@ const readGuideGeom = (width, height, _guideTick = 0) => {
 export const FaceScanOverlay = ({ width, height, ready = false }) => {
   const uid = useId().replace(/:/g, '');
   const [guideTick, setGuideTick] = useState(0);
+  const [pose, setPose] = useState('center');
 
   useEffect(() => {
-    const id = setInterval(() => setGuideTick((t) => t + 1), 400);
+    const id = setInterval(() => {
+      setGuideTick((t) => t + 1);
+      setPose(readPose());
+    }, 400);
     return () => clearInterval(id);
   }, []);
 
@@ -54,6 +70,11 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
   ];
 
   const frameStroke = ready ? GOLD : 'rgba(245, 196, 0, 0.65)';
+  const poseCopy = POSE_UI[pose] ?? POSE_UI.center;
+  const badgeW = Math.min(w * 0.78, 320);
+  const badgeH = 52;
+  const badgeX = cx - badgeW / 2;
+  const badgeY = Math.min(y + boxH + 14, h - badgeH - 8);
 
   return (
     <svg
@@ -99,6 +120,43 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
           /> */}
         </g>
       ))}
+
+      <g aria-label={poseCopy.title}>
+        <rect
+          x={badgeX}
+          y={badgeY}
+          width={badgeW}
+          height={badgeH}
+          rx={14}
+          fill="rgba(245, 196, 0, 0.96)"
+          stroke="#1A1A1A"
+          strokeWidth={1.5}
+        />
+        <text
+          x={cx}
+          y={badgeY + 22}
+          textAnchor="middle"
+          fill="#1A1A1A"
+          fontSize={16}
+          fontWeight="700"
+          fontFamily="system-ui, -apple-system, Segoe UI, sans-serif"
+        >
+          {pose === 'left' ? '← ' : ''}
+          {poseCopy.title}
+          {pose === 'right' ? ' →' : ''}
+        </text>
+        <text
+          x={cx}
+          y={badgeY + 40}
+          textAnchor="middle"
+          fill="#4A4528"
+          fontSize={11}
+          fontWeight="600"
+          fontFamily="system-ui, -apple-system, Segoe UI, sans-serif"
+        >
+          {poseCopy.hint}
+        </text>
+      </g>
     </svg>
   );
 };
