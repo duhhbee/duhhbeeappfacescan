@@ -171,8 +171,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       
       // Desenhar a malha facial em branco com menor opacidade
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(255, 255, 255, 0.10)',
-        lineWidth: 1
+        color: 'rgba(245, 196, 0, 0.12)',
+        lineWidth: 0.8
       });
 
       // Desenhar pontos de interseção mais brilhantes
@@ -185,7 +185,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           0,
           2 * Math.PI
         );
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fillStyle = 'rgba(245, 196, 0, 0.35)';
         ctx.fill();
       });
 
@@ -354,7 +354,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             transform: 'scaleX(-1)'
           }}
         />
-        <FaceScanOverlay />
+        <FaceScanOverlay width={dimensions.width} height={dimensions.height} />
       </div>
     </div>
   );

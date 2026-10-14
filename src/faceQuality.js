@@ -9,8 +9,8 @@ const LM = {
 export const QUALITY_THRESHOLDS = {
   minFaceWidthNorm: 0.26,
   maxFaceWidthNorm: 0.82,
-  maxYawDegCenter: 15,
-  maxYawDegSide: 38,
+  maxYawDegCenter: 18,
+  maxYawDegSide: 45,
   minMeanLuma: 45,
   maxMeanLuma: 220,
   maxLightAsymmetryRatio: 1.45,
@@ -173,10 +173,7 @@ export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight)
   else if (meanLuma > t.maxMeanLuma) rejectReason = 'too_bright';
   else if (asymmetryRatio > t.maxLightAsymmetryRatio) rejectReason = 'uneven_light';
   else if (blurVariance < t.minBlurVariance) rejectReason = 'blurry';
-  else if (pose === 'center' && Math.abs(yawDeg) > t.maxYawDegCenter) rejectReason = 'head_angle';
-  else if (pose === 'left' && yawDeg > -8) rejectReason = 'head_angle';
-  else if (pose === 'right' && yawDeg < 8) rejectReason = 'head_angle';
-  else if (Math.abs(yawDeg) > t.maxYawDegSide) rejectReason = 'head_angle';
+  else if (Math.abs(yawDeg) > t.maxYawDegCenter) rejectReason = 'head_angle';
 
   const lighting =
     meanLuma >= t.minMeanLuma &&
@@ -184,7 +181,7 @@ export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight)
     asymmetryRatio <= t.maxLightAsymmetryRatio;
 
   const qualityOk = rejectReason === null;
-  const position = pose === 'center' ? centered && qualityOk : qualityOk;
+  const position = centered && qualityOk;
 
   const faceFound =
     !!landmarks?.length &&
