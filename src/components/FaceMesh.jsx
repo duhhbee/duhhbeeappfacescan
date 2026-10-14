@@ -2,9 +2,10 @@ import { useRef, useEffect, useState } from 'react';
 import { FaceMesh, FACEMESH_TESSELATION } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
 import { drawConnectors } from '@mediapipe/drawing_utils';
-import overlayImage from '../assets/overlay.png';
 import linhaImage from '../assets/linha.png';
+import { FaceScanOverlay } from './FaceScanOverlay';
 import scanAudio from '../assets/duhhbeeaudioscan.mp3';
+import { evaluateFaceQuality } from '../faceQuality';
 
 export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const videoRef = useRef(null);
@@ -41,15 +42,16 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     };
   }, []);
 
-  const checkLighting = (landmarks) => {
-    const avgBrightness = landmarks.reduce((sum, point) => sum + point.y, 0) / landmarks.length;
-    return avgBrightness > 0.2 && avgBrightness < 0.8;
-  };
+  const lastPostRef = useRef({ at: 0, key: '' });
 
-  const checkPosition = (landmarks) => {
-    const centerX = landmarks.reduce((sum, point) => sum + point.x, 0) / landmarks.length;
-    const centerY = landmarks.reduce((sum, point) => sum + point.y, 0) / landmarks.length;
-    return (centerX > 0.3 && centerX < 0.7 && centerY > 0.3 && centerY < 0.7);
+  const postToApp = (payload) => {
+    const key = JSON.stringify(payload);
+    const now = Date.now();
+    if (key === lastPostRef.current.key && now - lastPostRef.current.at < 120) return;
+    lastPostRef.current = { at: now, key };
+    if (window.ReactNativeWebView?.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+    }
   };
 
   const captureImage = (canvas) => {
@@ -57,61 +59,65 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   };
 
   useEffect(() => {
-    const getVideoConstraints = async () => {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        const frontCamera = videoDevices.find(device => 
-          device.label.toLowerCase().includes('front') || 
-          device.label.toLowerCase().includes('user') ||
-          device.label.toLowerCase().includes('selfie')
-        );
+    const isMobileDevice = () =>
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        const constraints = {
-          deviceId: frontCamera ? { exact: frontCamera.deviceId } : undefined,
-          facingMode: frontCamera ? undefined : { exact: 'user' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        };
-
-        setVideoConstraints(constraints);
-      } catch (error) {
-        console.error('Error getting video constraints:', error);
-        setVideoConstraints({
-          facingMode: { exact: 'user' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        });
+    /** Pick the first constraint set the browser actually accepts (avoids OverconstrainedError). */
+    const resolveVideoConstraints = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        const insecure =
+          typeof window !== 'undefined' &&
+          !window.isSecureContext &&
+          !/localhost|127\.0\.0\.1/.test(window.location.hostname);
+        const msg = insecure
+          ? 'Camera needs HTTPS on mobile. Open https://YOUR-MAC-IP:5173 (accept certificate) or use duhhbeeappfacescan-development.vercel.app'
+          : 'Camera is not available in this browser.';
+        console.error('[facescan]', msg);
+        alert(msg);
+        return null;
       }
+
+      const mobile = isMobileDevice();
+      const candidates = mobile
+        ? [
+            { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } },
+            { facingMode: { ideal: 'user' } },
+            true,
+          ]
+        : [
+            { width: { ideal: 1280 }, height: { ideal: 720 } },
+            { width: { ideal: 640 }, height: { ideal: 480 } },
+            { facingMode: { ideal: 'user' } },
+            true,
+          ];
+
+      for (const candidate of candidates) {
+        try {
+          const video = candidate === true ? true : candidate;
+          const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+          stream.getTracks().forEach((track) => track.stop());
+          return candidate === true ? {} : candidate;
+        } catch (error) {
+          console.warn('[facescan] camera constraints rejected:', candidate, error?.name || error);
+        }
+      }
+      return {};
     };
 
-    getVideoConstraints();
+    resolveVideoConstraints()
+      .then((resolved) => {
+        if (resolved !== null) setVideoConstraints(resolved);
+      })
+      .catch((error) => {
+        console.error('[facescan] could not resolve camera constraints', error);
+        setVideoConstraints({});
+      });
   }, []);
 
   useEffect(() => {
     const calculateDimensions = () => {
-      const isMobile = window.matchMedia("(max-width: 768px)").matches;
-      let newWidth, newHeight;
-
-      if (isMobile) {
-        newHeight = windowHeight;
-        newWidth = (windowHeight * 9) / 16;
-        
-        if (newWidth > windowWidth) {
-          newWidth = windowWidth;
-          newHeight = (windowWidth * 16) / 9;
-        }
-      } else {
-        if (windowWidth / windowHeight > 16/9) {
-          newHeight = windowHeight;
-          newWidth = (windowHeight * 16) / 9;
-        } else {
-          newWidth = windowWidth;
-          newHeight = (windowWidth * 9) / 16;
-        }
-      }
-
-      setDimensions({ width: newWidth, height: newHeight });
+      setDimensions({ width: windowWidth, height: windowHeight });
     };
 
     calculateDimensions();
@@ -242,15 +248,15 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           audioRef.current.pause();
         }
         
-        const data = {
+        postToApp({
           faceFound: false,
           lighting: false,
           position: false,
-          image: null
-        };
-        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-          window.ReactNativeWebView.postMessage(JSON.stringify(data));
-        }
+          faceClear: true,
+          qualityOk: false,
+          rejectReason: 'no_face',
+          image: null,
+        });
         return;
       }
 
@@ -265,28 +271,26 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const landmarks = results.multiFaceLandmarks[0];
       drawFaceMesh(canvasCtx, landmarks);
 
-      const lighting = checkLighting(landmarks);
-      const position = checkPosition(landmarks);
-      const faceFound = lighting && position;
-      
-      console.log('[DEBUG] lighting:', lighting);
-      console.log('[DEBUG] position:', position);
-      console.log('[DEBUG] faceFound:', faceFound);
-      
-      const image = faceFound ? captureImage(canvasElement) : null;
-      
-      const data = {
-        faceFound,
-        lighting,
-        position,
-        image
-      };
-      
-      console.log('[DEBUG] Enviando para o app:', data);
-      
-      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-        window.ReactNativeWebView.postMessage(JSON.stringify(data));
-      }
+      const quality = evaluateFaceQuality(
+        videoElement,
+        landmarks,
+        canvasElement.width,
+        canvasElement.height,
+      );
+
+      const ready = quality.qualityOk;
+      const image = ready ? captureImage(canvasElement) : null;
+
+      postToApp({
+        faceFound: quality.faceFound,
+        lighting: quality.lighting,
+        position: quality.position,
+        faceClear: quality.faceClear,
+        qualityOk: quality.qualityOk,
+        rejectReason: quality.rejectReason,
+        metrics: quality.metrics,
+        image,
+      });
 
 
       canvasCtx.restore();
@@ -312,20 +316,15 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         position: 'relative',
         width: '100%',
         height: '100vh',
-        backgroundColor: 'rgb(242, 214, 104)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden'
+        backgroundColor: '#000000',
+        overflow: 'hidden',
       }}
     >
       <div
         style={{
           position: 'relative',
-          width: dimensions.width,
-          height: dimensions.height,
-          maxWidth: '100%',
-          maxHeight: '100vh',
+          width: '100%',
+          height: '100%',
         }}
       >
         <video
@@ -355,19 +354,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             transform: 'scaleX(-1)'
           }}
         />
-        <img
-          src={overlayImage}
-          alt="Overlay"
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '90%',
-            height: 'auto',
-            pointerEvents: 'none'
-          }}
-        />
+        <FaceScanOverlay />
       </div>
     </div>
   );
