@@ -17,7 +17,11 @@ const readGuideGeom = (width, height, _guideTick = 0) => {
         : 0.3;
     const bandTop = h * (Number.isFinite(topPad) ? topPad : 0.11);
     const bandH = h * (1 - (topPad || 0.11) - (bottomPad || 0.3));
-    const cy = bandTop + bandH * 0.5;
+    const bandCenter =
+      typeof window !== 'undefined' && window.__duhhGuideBandCenter != null
+        ? Number(window.__duhhGuideBandCenter)
+        : 0.58;
+    const cy = bandTop + bandH * (Number.isFinite(bandCenter) ? bandCenter : 0.58);
     const boxW = w * 0.88;
     const boxH = Math.max(bandH * 0.88, h * 0.32);
     const x = cx - boxW / 2;

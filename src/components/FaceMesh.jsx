@@ -23,6 +23,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     if (typeof window !== 'undefined') {
       if (window.__duhhGuideTopPad == null) window.__duhhGuideTopPad = 0.11;
       if (window.__duhhGuideBottomPad == null) window.__duhhGuideBottomPad = 0.3;
+      if (window.__duhhGuideBandCenter == null) window.__duhhGuideBandCenter = 0.58;
     }
   }, []);
 
