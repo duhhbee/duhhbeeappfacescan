@@ -3,9 +3,9 @@ import { useEffect, useId, useState } from 'react';
 const GOLD = '#F5C400';
 
 const POSE_UI = {
-  center: { title: 'CENTER', hint: 'Look straight at camera' },
-  left: { title: 'TURN LEFT', hint: 'Left cheek toward camera' },
-  right: { title: 'TURN RIGHT', hint: 'Right cheek toward camera' },
+  center: { title: 'CENTER', width: 132 },
+  left: { title: 'TURN LEFT', width: 158 },
+  right: { title: 'TURN RIGHT', width: 168 },
 };
 
 const readPose = () => {
@@ -71,10 +71,15 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
 
   const frameStroke = ready ? GOLD : 'rgba(245, 196, 0, 0.65)';
   const poseCopy = POSE_UI[pose] ?? POSE_UI.center;
-  const badgeW = Math.min(w * 0.78, 320);
-  const badgeH = 52;
-  const badgeX = cx - badgeW / 2;
-  const badgeY = Math.min(y + boxH + 14, h - badgeH - 8);
+  const pillW = poseCopy.width;
+  const pillH = 40;
+  const pillX = cx - pillW / 2;
+  const pillY = Math.min(y + boxH + 16, h - pillH - 12);
+  const pillRx = pillH / 2;
+  const pillStroke = ready ? GOLD : 'rgba(245, 196, 0, 0.55)';
+  const chevronY = pillY + pillH / 2;
+  const chevronLeftX = pillX + 18;
+  const chevronRightX = pillX + pillW - 18;
 
   return (
     <svg
@@ -89,6 +94,9 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
           <rect width={w} height={h} fill="white" />
           <path d={framePath} fill="black" />
         </mask>
+        <filter id={`pose-pill-shadow-${uid}`} x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000" floodOpacity="0.5" />
+        </filter>
       </defs>
 
       <rect width={w} height={h} fill="rgba(0,0,0,0.42)" mask={`url(#${maskId})`} />
@@ -121,40 +129,48 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
         </g>
       ))}
 
-      <g aria-label={poseCopy.title}>
+      <g aria-label={poseCopy.title} filter={`url(#pose-pill-shadow-${uid})`}>
         <rect
-          x={badgeX}
-          y={badgeY}
-          width={badgeW}
-          height={badgeH}
-          rx={14}
-          fill="rgba(245, 196, 0, 0.96)"
-          stroke="#1A1A1A"
-          strokeWidth={1.5}
+          x={pillX}
+          y={pillY}
+          width={pillW}
+          height={pillH}
+          rx={pillRx}
+          fill="rgba(12, 12, 12, 0.58)"
+          stroke={pillStroke}
+          strokeWidth={2}
         />
+        {pose === 'left' ? (
+          <path
+            d={`M ${chevronLeftX + 6} ${chevronY - 7} L ${chevronLeftX - 4} ${chevronY} L ${chevronLeftX + 6} ${chevronY + 7}`}
+            fill="none"
+            stroke={GOLD}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ) : null}
+        {pose === 'right' ? (
+          <path
+            d={`M ${chevronRightX - 6} ${chevronY - 7} L ${chevronRightX + 4} ${chevronY} L ${chevronRightX - 6} ${chevronY + 7}`}
+            fill="none"
+            stroke={GOLD}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ) : null}
         <text
-          x={cx}
-          y={badgeY + 22}
+          x={cx + (pose === 'left' ? 6 : pose === 'right' ? -6 : 0)}
+          y={pillY + pillH / 2 + 5}
           textAnchor="middle"
-          fill="#1A1A1A"
-          fontSize={16}
+          fill="#FFFFFF"
+          fontSize={12}
           fontWeight="700"
+          letterSpacing="0.12em"
           fontFamily="system-ui, -apple-system, Segoe UI, sans-serif"
         >
-          {pose === 'left' ? '← ' : ''}
           {poseCopy.title}
-          {pose === 'right' ? ' →' : ''}
-        </text>
-        <text
-          x={cx}
-          y={badgeY + 40}
-          textAnchor="middle"
-          fill="#4A4528"
-          fontSize={11}
-          fontWeight="600"
-          fontFamily="system-ui, -apple-system, Segoe UI, sans-serif"
-        >
-          {poseCopy.hint}
         </text>
       </g>
     </svg>
