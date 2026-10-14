@@ -2,10 +2,9 @@ import { useRef, useEffect, useState } from 'react';
 import { FaceMesh, FACEMESH_TESSELATION } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
 import { drawConnectors } from '@mediapipe/drawing_utils';
-import overlayImage from '../assets/overlay.png';
-import linhaImage from '../assets/linha.png';
 import scanAudio from '../assets/duhhbeeaudioscan.mp3';
 import { evaluateFaceQuality } from '../faceQuality';
+import { FaceScanOverlay } from './FaceScanOverlay';
 
 export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const videoRef = useRef(null);
@@ -16,17 +15,11 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const opacityDirectionRef = useRef(1);
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
   const [videoConstraints, setVideoConstraints] = useState(null);
-  const scanLineImageRef = useRef(null);
+  const [frameReady, setFrameReady] = useState(false);
   const audioRef = useRef(null);
   const lastPostRef = useRef({ at: 0, key: '' });
 
   useEffect(() => {
-    const img = new Image();
-    img.src = linhaImage;
-    img.onload = () => {
-      scanLineImageRef.current = img;
-    };
-
     const audio = new Audio(scanAudio);
     audio.loop = true;
     audio.volume = 0.5;
@@ -113,25 +106,19 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   useEffect(() => {
     const calculateDimensions = () => {
       const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      if (isMobile) {
+        setDimensions({ width: windowWidth, height: windowHeight });
+        return;
+      }
       let newWidth;
       let newHeight;
-
-      if (isMobile) {
-        newHeight = windowHeight;
-        newWidth = (windowHeight * 9) / 16;
-
-        if (newWidth > windowWidth) {
-          newWidth = windowWidth;
-          newHeight = (windowWidth * 16) / 9;
-        }
-      } else if (windowWidth / windowHeight > 16 / 9) {
+      if (windowWidth / windowHeight > 16 / 9) {
         newHeight = windowHeight;
         newWidth = (windowHeight * 16) / 9;
       } else {
         newWidth = windowWidth;
         newHeight = (windowWidth * 9) / 16;
       }
-
       setDimensions({ width: newWidth, height: newHeight });
     };
 
@@ -229,22 +216,17 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
       const currentScanY = minY + scanLineRef.current;
 
-      if (currentScanY >= minY && currentScanY <= maxY && scanLineImageRef.current) {
+      if (currentScanY >= minY && currentScanY <= maxY) {
         ctx.save();
-        const lineWidth = (maxX - minX) * 1.2;
-        const lineHeight =
-          scanLineImageRef.current.height * (lineWidth / scanLineImageRef.current.width);
-
-        ctx.globalAlpha = opacityRef.current;
-
-        ctx.drawImage(
-          scanLineImageRef.current,
-          minX - (lineWidth - (maxX - minX)) / 2,
-          currentScanY - lineHeight / 2,
-          lineWidth,
-          lineHeight,
-        );
-
+        const lineWidth = (maxX - minX) * 1.15;
+        const left = minX - (lineWidth - (maxX - minX)) / 2;
+        ctx.globalAlpha = 0.55 + opacityRef.current * 0.35;
+        ctx.strokeStyle = '#F5C400';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(left, currentScanY);
+        ctx.lineTo(left + lineWidth, currentScanY);
+        ctx.stroke();
         ctx.restore();
       }
     };
@@ -266,6 +248,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           rejectReason: 'no_face',
           image: null,
         };
+        setFrameReady(false);
         postToApp(empty);
         return;
       }
@@ -300,6 +283,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         metrics: quality.metrics,
         image,
       };
+      setFrameReady(ready);
       postToApp(payload);
 
       canvasCtx.restore();
@@ -325,7 +309,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         position: 'relative',
         width: '100%',
         height: '100vh',
-        backgroundColor: 'rgb(242, 214, 104)',
+        backgroundColor: '#0a0a0a',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -368,21 +352,10 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             transform: 'scaleX(-1)',
           }}
         />
-        <img
-          src={overlayImage}
-          alt="Overlay"
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '90%',
-            height: 'auto',
-            pointerEvents: 'none',
-            // Blue corner art → app gold (#F5C400 / #FCC000)
-            filter:
-              'brightness(0) saturate(100%) invert(78%) sepia(88%) saturate(1200%) hue-rotate(358deg) brightness(104%) contrast(101%)',
-          }}
+        <FaceScanOverlay
+          width={dimensions.width}
+          height={dimensions.height}
+          ready={frameReady}
         />
       </div>
     </div>
