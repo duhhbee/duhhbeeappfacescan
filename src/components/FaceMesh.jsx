@@ -2,9 +2,8 @@ import { useRef, useEffect, useState } from 'react';
 import { FaceMesh, FACEMESH_TESSELATION } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
 import { drawConnectors } from '@mediapipe/drawing_utils';
+import overlayImage from '../assets/overlay.png';
 import linhaImage from '../assets/linha.png';
-import { FaceScanOverlay } from './FaceScanOverlay';
-import { ScannerChrome } from './ScannerChrome';
 import scanAudio from '../assets/duhhbeeaudioscan.mp3';
 import { evaluateFaceQuality } from '../faceQuality';
 
@@ -16,31 +15,23 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const opacityRef = useRef(0.8);
   const opacityDirectionRef = useRef(1);
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
-  const [scanUi, setScanUi] = useState({
-    faceFound: false,
-    lighting: false,
-    qualityOk: false,
-    rejectReason: 'no_face',
-  });
   const [videoConstraints, setVideoConstraints] = useState(null);
   const scanLineImageRef = useRef(null);
   const audioRef = useRef(null);
+  const lastPostRef = useRef({ at: 0, key: '' });
 
   useEffect(() => {
-    // Carregar a imagem da linha
     const img = new Image();
     img.src = linhaImage;
     img.onload = () => {
       scanLineImageRef.current = img;
     };
 
-    // Configurar o áudio
     const audio = new Audio(scanAudio);
     audio.loop = true;
-    audio.volume = 0.5; // Volume em 50%
+    audio.volume = 0.5;
     audioRef.current = audio;
 
-    // Iniciar o áudio quando a face for detectada
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -48,8 +39,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       }
     };
   }, []);
-
-  const lastPostRef = useRef({ at: 0, key: '' });
 
   const postToApp = (payload) => {
     const key = JSON.stringify(payload);
@@ -69,7 +58,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     const isMobileDevice = () =>
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-    /** Pick the first constraint set the browser actually accepts (avoids OverconstrainedError). */
     const resolveVideoConstraints = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
         const insecure =
@@ -124,7 +112,27 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
   useEffect(() => {
     const calculateDimensions = () => {
-      setDimensions({ width: windowWidth, height: windowHeight });
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      let newWidth;
+      let newHeight;
+
+      if (isMobile) {
+        newHeight = windowHeight;
+        newWidth = (windowHeight * 9) / 16;
+
+        if (newWidth > windowWidth) {
+          newWidth = windowWidth;
+          newHeight = (windowWidth * 16) / 9;
+        }
+      } else if (windowWidth / windowHeight > 16 / 9) {
+        newHeight = windowHeight;
+        newWidth = (windowHeight * 16) / 9;
+      } else {
+        newWidth = windowWidth;
+        newHeight = (windowWidth * 9) / 16;
+      }
+
+      setDimensions({ width: newWidth, height: newHeight });
     };
 
     calculateDimensions();
@@ -161,7 +169,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       let maxX = -Infinity;
       let maxY = -Infinity;
 
-      landmarks.forEach(landmark => {
+      landmarks.forEach((landmark) => {
         if (isValidCoordinate(landmark.x) && isValidCoordinate(landmark.y)) {
           minX = Math.min(minX, landmark.x * canvasElement.width);
           minY = Math.min(minY, landmark.y * canvasElement.height);
@@ -175,24 +183,22 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
     const drawFaceMesh = (ctx, landmarks) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      
-      // Desenhar a malha facial em branco com menor opacidade
+
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(255, 255, 255, 0.06)',
-        lineWidth: 0.6
+        color: 'rgba(255, 255, 255, 0.10)',
+        lineWidth: 1,
       });
 
-      // Desenhar pontos de interseção mais brilhantes
-      landmarks.forEach(point => {
+      landmarks.forEach((point) => {
         ctx.beginPath();
         ctx.arc(
           point.x * canvasElement.width,
           point.y * canvasElement.height,
           1.5,
           0,
-          2 * Math.PI
+          2 * Math.PI,
         );
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.fill();
       });
 
@@ -210,7 +216,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         scanLineRef.current = 0;
       }
 
-      // Atualizar opacidade
       const opacitySpeed = 0.03;
       opacityRef.current += opacitySpeed * opacityDirectionRef.current;
 
@@ -224,24 +229,22 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
       const currentScanY = minY + scanLineRef.current;
 
-      // Desenhar a imagem da linha de scan
       if (currentScanY >= minY && currentScanY <= maxY && scanLineImageRef.current) {
         ctx.save();
-        const lineWidth = (maxX - minX) * 1.2; // Aumentar a largura em 20%
-        const lineHeight = scanLineImageRef.current.height * (lineWidth / scanLineImageRef.current.width);
-        
-        // Definir opacidade global com efeito de pulsação
+        const lineWidth = (maxX - minX) * 1.2;
+        const lineHeight =
+          scanLineImageRef.current.height * (lineWidth / scanLineImageRef.current.width);
+
         ctx.globalAlpha = opacityRef.current;
-        
-        // Desenhar a imagem da linha
+
         ctx.drawImage(
           scanLineImageRef.current,
-          minX - (lineWidth - (maxX - minX)) / 2, // Centralizar a linha aumentada
+          minX - (lineWidth - (maxX - minX)) / 2,
           currentScanY - lineHeight / 2,
           lineWidth,
-          lineHeight
+          lineHeight,
         );
-        
+
         ctx.restore();
       }
     };
@@ -249,12 +252,11 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     faceMesh.onResults((results) => {
       if (!results.multiFaceLandmarks || !results.multiFaceLandmarks.length) {
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-        
-        // Pausar o áudio quando não houver face detectada
+
         if (audioRef.current) {
           audioRef.current.pause();
         }
-        
+
         const empty = {
           faceFound: false,
           lighting: false,
@@ -264,14 +266,12 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           rejectReason: 'no_face',
           image: null,
         };
-        setScanUi(empty);
         postToApp(empty);
         return;
       }
 
-      // Iniciar ou retomar o áudio quando uma face for detectada
       if (audioRef.current && audioRef.current.paused) {
-        audioRef.current.play().catch(error => {
+        audioRef.current.play().catch((error) => {
           console.log('Erro ao reproduzir áudio:', error);
         });
       }
@@ -300,9 +300,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         metrics: quality.metrics,
         image,
       };
-      setScanUi({ ...payload, faceFound: true });
       postToApp(payload);
-
 
       canvasCtx.restore();
     });
@@ -311,7 +309,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       onFrame: async () => {
         await faceMesh.send({ image: videoElement });
       },
-      ...videoConstraints
+      ...videoConstraints,
     });
 
     camera.start();
@@ -327,15 +325,20 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         position: 'relative',
         width: '100%',
         height: '100vh',
-        backgroundColor: '#000000',
+        backgroundColor: 'rgb(242, 214, 104)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         overflow: 'hidden',
       }}
     >
       <div
         style={{
           position: 'relative',
-          width: '100%',
-          height: '100%',
+          width: dimensions.width,
+          height: dimensions.height,
+          maxWidth: '100%',
+          maxHeight: '100vh',
         }}
       >
         <video
@@ -347,7 +350,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             width: '100%',
             height: '100%',
             transform: 'scaleX(-1)',
-            objectFit: 'cover'
+            objectFit: 'cover',
           }}
           autoPlay
           playsInline
@@ -362,15 +365,22 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             left: 0,
             width: '100%',
             height: '100%',
-            transform: 'scaleX(-1)'
+            transform: 'scaleX(-1)',
           }}
         />
-        <FaceScanOverlay
-          width={dimensions.width}
-          height={dimensions.height}
-          ready={scanUi.qualityOk}
+        <img
+          src={overlayImage}
+          alt="Overlay"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '90%',
+            height: 'auto',
+            pointerEvents: 'none',
+          }}
         />
-        <ScannerChrome scan={scanUi} />
       </div>
     </div>
   );
