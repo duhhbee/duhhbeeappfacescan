@@ -379,6 +379,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             width: '90%',
             height: 'auto',
             pointerEvents: 'none',
+            // Blue corner art → app gold (#F5C400 / #FCC000)
+            filter:
+              'brightness(0) saturate(100%) invert(78%) sepia(88%) saturate(1200%) hue-rotate(358deg) brightness(104%) contrast(101%)',
           }}
         />
       </div>
