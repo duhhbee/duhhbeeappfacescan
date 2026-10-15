@@ -10,15 +10,15 @@ export const QUALITY_THRESHOLDS = {
   minFaceWidthNorm: 0.26,
   minFaceWidthNormSide: 0.22,
   maxFaceWidthNorm: 0.82,
-  maxYawDegCenter: 18,
-  minSideYawDeg: 11,
-  maxYawDegSide: 48,
+  maxYawDegCenter: 22,
+  minSideYawDeg: 8,
+  maxYawDegSide: 52,
   minMeanLuma: 45,
   maxMeanLuma: 220,
   maxLightAsymmetryRatio: 1.45,
   maxLightAsymmetryRatioSide: 2.0,
   minBlurVariance: 90,
-  minBlurVarianceSide: 72,
+  minBlurVarianceSide: 55,
 };
 
 const YAW_SMOOTH_FRAMES = 6;
