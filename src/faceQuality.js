@@ -1,3 +1,5 @@
+import { isFaceInOvalGuide } from './faceGuideGeom';
+
 /** MediaPipe Face Mesh landmark indices (subset). */
 const LM = {
   noseTip: 1,
@@ -7,9 +9,9 @@ const LM = {
 };
 
 export const QUALITY_THRESHOLDS = {
-  minFaceWidthNorm: 0.26,
-  minFaceWidthNormSide: 0.22,
-  maxFaceWidthNorm: 0.82,
+  minFaceWidthNorm: 0.24,
+  minFaceWidthNormSide: 0.2,
+  maxFaceWidthNorm: 0.78,
   maxYawDegCenter: 18,
   minSideYawDeg: 11,
   maxYawDegSide: 48,
@@ -230,7 +232,9 @@ export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight)
     asymmetryRatio <= maxAsymmetry;
 
   const qualityOk = rejectReason === null;
-  const inFrame = isCenteredInFrameForPose(landmarks, pose);
+  const inFrame =
+    isFaceInOvalGuide(landmarks, canvasWidth, canvasHeight, pose) ||
+    isCenteredInFrameForPose(landmarks, pose);
   const position = inFrame && qualityOk;
 
   const faceFound =
