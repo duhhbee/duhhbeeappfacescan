@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
-import { FaceMesh, FACEMESH_TESSELATION } from '@mediapipe/face_mesh';
+import { FaceMesh } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
-import { drawConnectors } from '@mediapipe/drawing_utils';
 import scanAudio from '../assets/duhhbeeaudioscan.mp3';
 import { evaluateFaceQuality } from '../faceQuality';
 import { FaceScanOverlay } from './FaceScanOverlay';
@@ -44,7 +43,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const postToApp = (payload) => {
     const key = JSON.stringify(payload);
     const now = Date.now();
-    if (key === lastPostRef.current.key && now - lastPostRef.current.at < 120) return;
+    if (key === lastPostRef.current.key && now - lastPostRef.current.at < 100) return;
     lastPostRef.current = { at: now, key };
     if (window.ReactNativeWebView?.postMessage) {
       window.ReactNativeWebView.postMessage(JSON.stringify(payload));
@@ -149,9 +148,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
     faceMesh.setOptions({
       maxNumFaces: 1,
-      refineLandmarks: true,
+      refineLandmarks: false,
       minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5,
+      minTrackingConfidence: 0.45,
     });
 
     const isValidCoordinate = (value) => {
@@ -178,24 +177,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
     const drawFaceMesh = (ctx, landmarks) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-      drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(255, 255, 255, 0.10)',
-        lineWidth: 1,
-      });
-
-      landmarks.forEach((point) => {
-        ctx.beginPath();
-        ctx.arc(
-          point.x * canvasElement.width,
-          point.y * canvasElement.height,
-          1.5,
-          0,
-          2 * Math.PI,
-        );
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.fill();
-      });
 
       const { minX, minY, maxX, maxY } = getFaceBoundingBox(landmarks);
       const faceHeight = maxY - minY;

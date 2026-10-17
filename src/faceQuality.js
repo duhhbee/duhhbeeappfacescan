@@ -1,3 +1,5 @@
+import { isFaceInGuideOval, readPose } from './guideGeometry';
+
 /** MediaPipe Face Mesh landmark indices (subset). */
 const LM = {
   noseTip: 1,
@@ -61,25 +63,16 @@ const smoothYawDeg = (rawYaw, pose) => {
   return yawHistory.reduce((sum, v) => sum + v, 0) / yawHistory.length;
 };
 
-export const isCenteredInFrame = (landmarks, loose = false) => {
+const faceCentroid = (landmarks) => {
   const centerX = landmarks.reduce((sum, p) => sum + p.x, 0) / landmarks.length;
   const centerY = landmarks.reduce((sum, p) => sum + p.y, 0) / landmarks.length;
-  if (loose) {
-    return centerX > 0.22 && centerX < 0.78 && centerY > 0.22 && centerY < 0.78;
-  }
-  return centerX > 0.28 && centerX < 0.72 && centerY > 0.34 && centerY < 0.78;
+  return { centerX, centerY };
 };
 
-/** Side poses: allow face centroid to shift toward the turn direction. */
-export const isCenteredInFrameForPose = (landmarks, pose) => {
-  if (pose === 'center') return isCenteredInFrame(landmarks, false);
-
-  const centerX = landmarks.reduce((sum, p) => sum + p.x, 0) / landmarks.length;
-  const centerY = landmarks.reduce((sum, p) => sum + p.y, 0) / landmarks.length;
-  const shift = pose === 'left' ? 0.06 : pose === 'right' ? -0.06 : 0;
-  const adjX = centerX - shift;
-
-  return adjX > 0.18 && adjX < 0.82 && centerY > 0.2 && centerY < 0.82;
+/** Aligns with on-screen oval guide (see guideGeometry.js). */
+export const isCenteredInFrameForPose = (landmarks, pose, canvasWidth, canvasHeight) => {
+  const { centerX, centerY } = faceCentroid(landmarks);
+  return isFaceInGuideOval(centerX, centerY, pose, canvasWidth, canvasHeight);
 };
 
 /** Selfie preview is mirrored — user "left" matches positive yaw here. */
@@ -182,12 +175,6 @@ export const estimateBlurVariance = (video) => {
   return sumSq / count - mean * mean;
 };
 
-const readPose = () => {
-  const p = typeof window !== 'undefined' ? window.__duhhPose : undefined;
-  if (p === 'left' || p === 'right' || p === 'center') return p;
-  return 'center';
-};
-
 const isSidePose = (pose) => pose === 'left' || pose === 'right';
 
 /**
@@ -230,7 +217,7 @@ export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight)
     asymmetryRatio <= maxAsymmetry;
 
   const qualityOk = rejectReason === null;
-  const inFrame = isCenteredInFrameForPose(landmarks, pose);
+  const inFrame = isCenteredInFrameForPose(landmarks, pose, canvasWidth, canvasHeight);
   const position = inFrame && qualityOk;
 
   const faceFound =
