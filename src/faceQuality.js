@@ -218,12 +218,15 @@ export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight)
 
   const qualityOk = rejectReason === null;
   const inFrame = isCenteredInFrameForPose(landmarks, pose, canvasWidth, canvasHeight);
-  const position = inFrame && qualityOk;
+  /** Oval alignment only — separate from lighting/pose quality (capture uses qualityOk). */
+  const position = inFrame;
 
+  /** True whenever MediaPipe produced a usable landmark set (mesh visible). */
   const faceFound =
-    !!landmarks?.length &&
-    widthNorm >= minWidth * 0.75 &&
-    meanLuma >= t.minMeanLuma * 0.65;
+    Array.isArray(landmarks) &&
+    landmarks.length >= 10 &&
+    Number.isFinite(widthNorm) &&
+    widthNorm > 0.04;
 
   return {
     lighting,

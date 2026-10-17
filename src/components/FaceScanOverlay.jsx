@@ -19,8 +19,8 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
   const maskId = `mask-${uid}`;
   const glowId = `oval-glow-${uid}`;
 
-  const outerStroke = ready ? GOLD : 'rgba(245, 196, 0, 0.72)';
-  const innerStroke = ready ? 'rgba(245, 196, 0, 0.45)' : 'rgba(255, 255, 255, 0.28)';
+  const outerStroke = ready ? GOLD : 'rgba(245, 196, 0, 0.68)';
+  const innerStroke = ready ? 'rgba(245, 196, 0, 0.4)' : 'rgba(255, 255, 255, 0.32)';
 
   const bannerW = Math.min(w * 0.92, 340);
   const bannerH = 56;

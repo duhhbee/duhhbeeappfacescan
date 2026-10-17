@@ -177,30 +177,34 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     };
 
     const drawFaceMesh = (ctx, landmarks) => {
-      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      const cw = canvasElement.width;
+      const ch = canvasElement.height;
+      ctx.clearRect(0, 0, cw, ch);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
 
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(255, 255, 255, 0.10)',
-        lineWidth: 1,
+        color: 'rgba(255, 255, 255, 0.09)',
+        lineWidth: 0.75,
+      });
+      drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
+        color: 'rgba(46, 230, 214, 0.14)',
+        lineWidth: 0.55,
       });
 
-      landmarks.forEach((point) => {
+      for (let i = 0; i < landmarks.length; i += 1) {
+        const point = landmarks[i];
         ctx.beginPath();
-        ctx.arc(
-          point.x * canvasElement.width,
-          point.y * canvasElement.height,
-          1.5,
-          0,
-          2 * Math.PI,
-        );
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.arc(point.x * cw, point.y * ch, 1.15, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(46, 230, 214, 0.42)';
         ctx.fill();
-      });
+      }
 
       const { minX, minY, maxX, maxY } = getFaceBoundingBox(landmarks);
       const faceHeight = maxY - minY;
+      if (faceHeight < 8) return;
 
-      const scanSpeed = 1.5;
+      const scanSpeed = 1.25;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
 
       if (scanLineRef.current >= faceHeight) {
@@ -211,34 +215,49 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         scanLineRef.current = 0;
       }
 
-      const opacitySpeed = 0.03;
+      const opacitySpeed = 0.028;
       opacityRef.current += opacitySpeed * opacityDirectionRef.current;
 
       if (opacityRef.current >= 1) {
         opacityDirectionRef.current = -1;
         opacityRef.current = 1;
-      } else if (opacityRef.current <= 0.8) {
+      } else if (opacityRef.current <= 0.75) {
         opacityDirectionRef.current = 1;
-        opacityRef.current = 0.8;
+        opacityRef.current = 0.75;
       }
 
       const currentScanY = minY + scanLineRef.current;
+      const padX = (maxX - minX) * 0.08;
+      const left = minX - padX;
+      const bandW = maxX - minX + padX * 2;
+      const bandH = Math.max(22, faceHeight * 0.1);
 
-      if (currentScanY >= minY && currentScanY <= maxY) {
-        ctx.save();
-        const lineWidth = (maxX - minX) * 1.15;
-        const left = minX - (lineWidth - (maxX - minX)) / 2;
-        ctx.globalAlpha = 0.5 + opacityRef.current * 0.4;
-        ctx.strokeStyle = '#2EE6D6';
-        ctx.lineWidth = 2.5;
-        ctx.shadowColor = '#2EE6D6';
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.moveTo(left, currentScanY);
-        ctx.lineTo(left + lineWidth, currentScanY);
-        ctx.stroke();
-        ctx.restore();
-      }
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(left, minY, bandW, faceHeight);
+      ctx.clip();
+
+      const y0 = currentScanY - bandH / 2;
+      const grad = ctx.createLinearGradient(0, y0, 0, y0 + bandH);
+      const peak = 0.18 + opacityRef.current * 0.12;
+      grad.addColorStop(0, 'rgba(46, 230, 214, 0)');
+      grad.addColorStop(0.45, `rgba(46, 230, 214, ${peak * 0.55})`);
+      grad.addColorStop(0.5, `rgba(255, 255, 255, ${peak})`);
+      grad.addColorStop(0.55, `rgba(46, 230, 214, ${peak * 0.55})`);
+      grad.addColorStop(1, 'rgba(46, 230, 214, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(left, y0, bandW, bandH);
+
+      ctx.globalAlpha = 0.35 + opacityRef.current * 0.35;
+      ctx.strokeStyle = '#2EE6D6';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = '#2EE6D6';
+      ctx.shadowBlur = 4;
+      ctx.beginPath();
+      ctx.moveTo(left, currentScanY);
+      ctx.lineTo(left + bandW, currentScanY);
+      ctx.stroke();
+      ctx.restore();
     };
 
     faceMesh.onResults((results) => {

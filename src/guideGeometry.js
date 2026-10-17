@@ -30,18 +30,18 @@ export const readPose = () => {
 export const POSE_INSTRUCTIONS = {
   center: {
     title: 'CENTER YOUR FACE',
-    detail: 'Look straight at the phone — fill the oval evenly',
-    short: 'Face forward in the oval',
+    detail: 'Look straight at the camera and keep both cheeks visible.',
+    short: 'Center',
   },
   left: {
-    title: 'TURN YOUR HEAD LEFT',
-    detail: 'Show your left ear & left cheek to the camera',
-    short: 'Left side toward camera ←',
+    title: 'TURN YOUR FACE LEFT',
+    detail: 'Slowly turn your face to the left.',
+    short: 'Left',
   },
   right: {
-    title: 'TURN YOUR HEAD RIGHT',
-    detail: 'Show your right ear & right cheek to the camera',
-    short: 'Right side toward camera →',
+    title: 'TURN YOUR FACE RIGHT',
+    detail: 'Slowly turn your face to the right.',
+    short: 'Right',
   },
 };
 
