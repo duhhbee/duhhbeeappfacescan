@@ -26,6 +26,28 @@ export const readPose = () => {
   return 'center';
 };
 
+/** On-screen + app copy — “your left” = user’s own left side toward camera (selfie mirror). */
+export const POSE_INSTRUCTIONS = {
+  center: {
+    title: 'CENTER YOUR FACE',
+    detail: 'Look straight at the phone — fill the oval evenly',
+    short: 'Face forward in the oval',
+  },
+  left: {
+    title: 'TURN YOUR HEAD LEFT',
+    detail: 'Show your left ear & left cheek to the camera',
+    short: 'Left side toward camera ←',
+  },
+  right: {
+    title: 'TURN YOUR HEAD RIGHT',
+    detail: 'Show your right ear & right cheek to the camera',
+    short: 'Right side toward camera →',
+  },
+};
+
+export const poseInstruction = (pose) =>
+  POSE_INSTRUCTIONS[pose] ?? POSE_INSTRUCTIONS.center;
+
 /**
  * Oval guide in pixel space (canvas / overlay dimensions).
  */

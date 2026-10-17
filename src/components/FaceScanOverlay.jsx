@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { readGuideGeom, readPose } from '../guideGeometry';
+import { readGuideGeom, readPose, poseInstruction } from '../guideGeometry';
 
 const GOLD = '#F5C400';
 
@@ -15,18 +15,24 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
   }, []);
 
   const { w, h, cx, cy, rx, ry } = readGuideGeom(width, height);
+  const copy = poseInstruction(pose);
   const maskId = `mask-${uid}`;
   const glowId = `oval-glow-${uid}`;
 
   const outerStroke = ready ? GOLD : 'rgba(245, 196, 0, 0.72)';
   const innerStroke = ready ? 'rgba(245, 196, 0, 0.45)' : 'rgba(255, 255, 255, 0.28)';
 
-  const poseHint =
+  const bannerW = Math.min(w * 0.92, 340);
+  const bannerH = 56;
+  const bannerX = cx - bannerW / 2;
+  const bannerY = Math.max(12, cy - ry - bannerH - 20);
+
+  const turnArrow =
     pose === 'left'
-      ? { label: '←', opacity: 1 }
+      ? { x1: cx + rx * 0.55, y1: cy, x2: cx - rx * 0.35, y2: cy, head: 'left' }
       : pose === 'right'
-        ? { label: '→', opacity: 1 }
-        : { label: '•', opacity: 0.85 };
+        ? { x1: cx - rx * 0.55, y1: cy, x2: cx + rx * 0.35, y2: cy, head: 'right' }
+        : null;
 
   return (
     <svg
@@ -52,6 +58,40 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
 
       <rect width={w} height={h} fill="rgba(0,0,0,0.48)" mask={`url(#${maskId})`} />
 
+      <rect
+        x={bannerX}
+        y={bannerY}
+        width={bannerW}
+        height={bannerH}
+        rx={14}
+        fill="rgba(8, 8, 8, 0.72)"
+        stroke={ready ? GOLD : 'rgba(245, 196, 0, 0.55)'}
+        strokeWidth={2}
+      />
+      <text
+        x={cx}
+        y={bannerY + 22}
+        textAnchor="middle"
+        fill={ready ? GOLD : '#FFFFFF'}
+        fontSize={13}
+        fontWeight="800"
+        letterSpacing="0.06em"
+        fontFamily="system-ui, -apple-system, sans-serif"
+      >
+        {copy.title}
+      </text>
+      <text
+        x={cx}
+        y={bannerY + 42}
+        textAnchor="middle"
+        fill="rgba(255,255,255,0.88)"
+        fontSize={11}
+        fontWeight="600"
+        fontFamily="system-ui, -apple-system, sans-serif"
+      >
+        {copy.detail}
+      </text>
+
       <ellipse
         cx={cx}
         cy={cy}
@@ -75,35 +115,41 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
         strokeLinecap="round"
       />
 
-      <line
-        x1={cx - rx * 0.55}
-        y1={cy}
-        x2={cx + rx * 0.55}
-        y2={cy}
-        stroke="rgba(255,255,255,0.15)"
-        strokeWidth={1}
-      />
-      <line
-        x1={cx}
-        y1={cy - ry * 0.55}
-        x2={cx}
-        y2={cy + ry * 0.55}
-        stroke="rgba(255,255,255,0.15)"
-        strokeWidth={1}
-      />
-
-      <text
-        x={cx}
-        y={cy + ry + 28}
-        textAnchor="middle"
-        fill={ready ? GOLD : 'rgba(255,255,255,0.7)'}
-        fontSize={22}
-        fontWeight="700"
-        opacity={poseHint.opacity}
-        fontFamily="system-ui, -apple-system, sans-serif"
-      >
-        {poseHint.label}
-      </text>
+      {turnArrow ? (
+        <g stroke={GOLD} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.85}>
+          <line x1={turnArrow.x1} y1={turnArrow.y1} x2={turnArrow.x2} y2={turnArrow.y2} />
+          {turnArrow.head === 'left' ? (
+            <path
+              d={`M ${turnArrow.x2} ${turnArrow.y2} L ${turnArrow.x2 + 12} ${turnArrow.y2 - 8} M ${turnArrow.x2} ${turnArrow.y2} L ${turnArrow.x2 + 12} ${turnArrow.y2 + 8}`}
+              fill="none"
+            />
+          ) : (
+            <path
+              d={`M ${turnArrow.x2} ${turnArrow.y2} L ${turnArrow.x2 - 12} ${turnArrow.y2 - 8} M ${turnArrow.x2} ${turnArrow.y2} L ${turnArrow.x2 - 12} ${turnArrow.y2 + 8}`}
+              fill="none"
+            />
+          )}
+        </g>
+      ) : (
+        <>
+          <line
+            x1={cx - rx * 0.4}
+            y1={cy}
+            x2={cx + rx * 0.4}
+            y2={cy}
+            stroke="rgba(255,255,255,0.2)"
+            strokeWidth={1}
+          />
+          <line
+            x1={cx}
+            y1={cy - ry * 0.4}
+            x2={cx}
+            y2={cy + ry * 0.4}
+            stroke="rgba(255,255,255,0.2)"
+            strokeWidth={1}
+          />
+        </>
+      )}
     </svg>
   );
 };

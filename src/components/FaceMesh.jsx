@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
-import { FaceMesh } from '@mediapipe/face_mesh';
+import { FaceMesh, FACEMESH_TESSELATION, FACEMESH_FACE_OVAL } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
+import { drawConnectors } from '@mediapipe/drawing_utils';
 import scanAudio from '../assets/duhhbeeaudioscan.mp3';
 import { evaluateFaceQuality } from '../faceQuality';
 import { FaceScanOverlay } from './FaceScanOverlay';
@@ -148,9 +149,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
     faceMesh.setOptions({
       maxNumFaces: 1,
-      refineLandmarks: false,
+      refineLandmarks: true,
       minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.45,
+      minTrackingConfidence: 0.5,
     });
 
     const isValidCoordinate = (value) => {
@@ -177,11 +178,24 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
 
     const drawFaceMesh = (ctx, landmarks) => {
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
+        color: 'rgba(46, 230, 214, 0.2)',
+        lineWidth: 0.85,
+      });
+      drawConnectors(ctx, landmarks, FACEMESH_FACE_OVAL, {
+        color: 'rgba(46, 230, 214, 0.75)',
+        lineWidth: 2,
+      });
 
       const { minX, minY, maxX, maxY } = getFaceBoundingBox(landmarks);
       const faceHeight = maxY - minY;
 
-      const scanSpeed = 1.5;
+      const scanSpeed = 1.15;
       scanLineRef.current += scanSpeed * scanDirectionRef.current;
 
       if (scanLineRef.current >= faceHeight) {
