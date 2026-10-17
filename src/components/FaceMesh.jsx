@@ -5,6 +5,7 @@ import { drawConnectors } from '@mediapipe/drawing_utils';
 import scanAudio from '../assets/duhhbeeaudioscan.mp3';
 import { evaluateFaceQuality } from '../faceQuality';
 import { FaceScanOverlay } from './FaceScanOverlay';
+import { mapLandmarksForCover } from '../landmarkDisplayMap';
 
 export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const videoRef = useRef(null);
@@ -289,14 +290,20 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       }
 
       canvasCtx.save();
-      const landmarks = results.multiFaceLandmarks[0];
+      const rawLandmarks = results.multiFaceLandmarks[0];
+      const vw = videoElement.videoWidth;
+      const vh = videoElement.videoHeight;
+      const cw = canvasElement.width;
+      const ch = canvasElement.height;
+      const landmarks = mapLandmarksForCover(rawLandmarks, vw, vh, cw, ch);
+
       drawFaceMesh(canvasCtx, landmarks);
 
       const quality = evaluateFaceQuality(
         videoElement,
         landmarks,
-        canvasElement.width,
-        canvasElement.height,
+        cw,
+        ch,
       );
 
       const ready = quality.qualityOk;
