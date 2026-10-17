@@ -1,7 +1,12 @@
 import { useRef, useEffect, useState } from 'react';
-import { FaceMesh, FACEMESH_TESSELATION, FACEMESH_FACE_OVAL } from '@mediapipe/face_mesh';
+import { FaceMesh } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
-import { drawConnectors } from '@mediapipe/drawing_utils';
+import {
+  advanceScanState,
+  createScanState,
+  drawFaceScanMesh,
+  smoothLandmarks,
+} from '../faceMeshDraw';
 import scanAudio from '../assets/duhhbeeaudioscan.mp3';
 import { evaluateFaceQuality } from '../faceQuality';
 import { FaceScanOverlay } from './FaceScanOverlay';
@@ -9,10 +14,6 @@ import { FaceScanOverlay } from './FaceScanOverlay';
 export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const scanLineRef = useRef(0);
-  const scanDirectionRef = useRef(1);
-  const opacityRef = useRef(0.8);
-  const opacityDirectionRef = useRef(1);
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
   const [videoConstraints, setVideoConstraints] = useState(null);
   const [frameReady, setFrameReady] = useState(false);
@@ -154,87 +155,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       minTrackingConfidence: 0.5,
     });
 
-    const isValidCoordinate = (value) => {
-      return typeof value === 'number' && isFinite(value) && value >= 0 && value <= 1;
-    };
-
-    const getFaceBoundingBox = (landmarks) => {
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-
-      landmarks.forEach((landmark) => {
-        if (isValidCoordinate(landmark.x) && isValidCoordinate(landmark.y)) {
-          minX = Math.min(minX, landmark.x * canvasElement.width);
-          minY = Math.min(minY, landmark.y * canvasElement.height);
-          maxX = Math.max(maxX, landmark.x * canvasElement.width);
-          maxY = Math.max(maxY, landmark.y * canvasElement.height);
-        }
-      });
-
-      return { minX, minY, maxX, maxY };
-    };
-
-    const drawFaceMesh = (ctx, landmarks) => {
-      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-
-      drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
-        color: 'rgba(46, 230, 214, 0.2)',
-        lineWidth: 0.85,
-      });
-      drawConnectors(ctx, landmarks, FACEMESH_FACE_OVAL, {
-        color: 'rgba(46, 230, 214, 0.75)',
-        lineWidth: 2,
-      });
-
-      const { minX, minY, maxX, maxY } = getFaceBoundingBox(landmarks);
-      const faceHeight = maxY - minY;
-
-      const scanSpeed = 1.15;
-      scanLineRef.current += scanSpeed * scanDirectionRef.current;
-
-      if (scanLineRef.current >= faceHeight) {
-        scanDirectionRef.current = -1;
-        scanLineRef.current = faceHeight;
-      } else if (scanLineRef.current <= 0) {
-        scanDirectionRef.current = 1;
-        scanLineRef.current = 0;
-      }
-
-      const opacitySpeed = 0.03;
-      opacityRef.current += opacitySpeed * opacityDirectionRef.current;
-
-      if (opacityRef.current >= 1) {
-        opacityDirectionRef.current = -1;
-        opacityRef.current = 1;
-      } else if (opacityRef.current <= 0.8) {
-        opacityDirectionRef.current = 1;
-        opacityRef.current = 0.8;
-      }
-
-      const currentScanY = minY + scanLineRef.current;
-
-      if (currentScanY >= minY && currentScanY <= maxY) {
-        ctx.save();
-        const lineWidth = (maxX - minX) * 1.15;
-        const left = minX - (lineWidth - (maxX - minX)) / 2;
-        ctx.globalAlpha = 0.5 + opacityRef.current * 0.4;
-        ctx.strokeStyle = '#2EE6D6';
-        ctx.lineWidth = 2.5;
-        ctx.shadowColor = '#2EE6D6';
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.moveTo(left, currentScanY);
-        ctx.lineTo(left + lineWidth, currentScanY);
-        ctx.stroke();
-        ctx.restore();
-      }
-    };
+    let smoothedLandmarks = null;
+    let scanState = createScanState();
 
     faceMesh.onResults((results) => {
       if (!results.multiFaceLandmarks || !results.multiFaceLandmarks.length) {
@@ -254,6 +176,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           image: null,
         };
         setFrameReady(false);
+        smoothedLandmarks = null;
         postToApp(empty);
         return;
       }
@@ -265,8 +188,25 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       }
 
       canvasCtx.save();
-      const landmarks = results.multiFaceLandmarks[0];
-      drawFaceMesh(canvasCtx, landmarks);
+      const raw = results.multiFaceLandmarks[0];
+      smoothedLandmarks = smoothLandmarks(smoothedLandmarks, raw);
+      const landmarks = smoothedLandmarks;
+
+      let minY = Infinity;
+      let maxY = -Infinity;
+      for (const p of landmarks) {
+        const y = p.y * canvasElement.height;
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+      scanState = advanceScanState(scanState, maxY - minY);
+      drawFaceScanMesh(
+        canvasCtx,
+        landmarks,
+        canvasElement.width,
+        canvasElement.height,
+        scanState,
+      );
 
       const quality = evaluateFaceQuality(
         videoElement,
@@ -355,6 +295,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
             width: '100%',
             height: '100%',
             transform: 'scaleX(-1)',
+            mixBlendMode: 'soft-light',
           }}
         />
         <FaceScanOverlay
