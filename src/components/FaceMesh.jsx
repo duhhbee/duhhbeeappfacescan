@@ -1,12 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
-import { FaceMesh } from '@mediapipe/face_mesh';
+import { FaceMesh, FACEMESH_TESSELATION } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
-import {
-  advanceScanState,
-  createScanState,
-  drawFaceScanMesh,
-  smoothLandmarks,
-} from '../faceMeshDraw';
+import { drawConnectors } from '@mediapipe/drawing_utils';
 import scanAudio from '../assets/duhhbeeaudioscan.mp3';
 import { evaluateFaceQuality } from '../faceQuality';
 import { FaceScanOverlay } from './FaceScanOverlay';
@@ -14,6 +9,10 @@ import { FaceScanOverlay } from './FaceScanOverlay';
 export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const scanLineRef = useRef(0);
+  const scanDirectionRef = useRef(1);
+  const opacityRef = useRef(0.8);
+  const opacityDirectionRef = useRef(1);
   const [dimensions, setDimensions] = useState({ width: windowWidth, height: windowHeight });
   const [videoConstraints, setVideoConstraints] = useState(null);
   const [frameReady, setFrameReady] = useState(false);
@@ -45,7 +44,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
   const postToApp = (payload) => {
     const key = JSON.stringify(payload);
     const now = Date.now();
-    if (key === lastPostRef.current.key && now - lastPostRef.current.at < 100) return;
+    if (key === lastPostRef.current.key && now - lastPostRef.current.at < 120) return;
     lastPostRef.current = { at: now, key };
     if (window.ReactNativeWebView?.postMessage) {
       window.ReactNativeWebView.postMessage(JSON.stringify(payload));
@@ -155,8 +154,92 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       minTrackingConfidence: 0.5,
     });
 
-    let smoothedLandmarks = null;
-    let scanState = createScanState();
+    const isValidCoordinate = (value) => {
+      return typeof value === 'number' && isFinite(value) && value >= 0 && value <= 1;
+    };
+
+    const getFaceBoundingBox = (landmarks) => {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      landmarks.forEach((landmark) => {
+        if (isValidCoordinate(landmark.x) && isValidCoordinate(landmark.y)) {
+          minX = Math.min(minX, landmark.x * canvasElement.width);
+          minY = Math.min(minY, landmark.y * canvasElement.height);
+          maxX = Math.max(maxX, landmark.x * canvasElement.width);
+          maxY = Math.max(maxY, landmark.y * canvasElement.height);
+        }
+      });
+
+      return { minX, minY, maxX, maxY };
+    };
+
+    const drawFaceMesh = (ctx, landmarks) => {
+      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {
+        color: 'rgba(255, 255, 255, 0.10)',
+        lineWidth: 1,
+      });
+
+      landmarks.forEach((point) => {
+        ctx.beginPath();
+        ctx.arc(
+          point.x * canvasElement.width,
+          point.y * canvasElement.height,
+          1.5,
+          0,
+          2 * Math.PI,
+        );
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fill();
+      });
+
+      const { minX, minY, maxX, maxY } = getFaceBoundingBox(landmarks);
+      const faceHeight = maxY - minY;
+
+      const scanSpeed = 1.5;
+      scanLineRef.current += scanSpeed * scanDirectionRef.current;
+
+      if (scanLineRef.current >= faceHeight) {
+        scanDirectionRef.current = -1;
+        scanLineRef.current = faceHeight;
+      } else if (scanLineRef.current <= 0) {
+        scanDirectionRef.current = 1;
+        scanLineRef.current = 0;
+      }
+
+      const opacitySpeed = 0.03;
+      opacityRef.current += opacitySpeed * opacityDirectionRef.current;
+
+      if (opacityRef.current >= 1) {
+        opacityDirectionRef.current = -1;
+        opacityRef.current = 1;
+      } else if (opacityRef.current <= 0.8) {
+        opacityDirectionRef.current = 1;
+        opacityRef.current = 0.8;
+      }
+
+      const currentScanY = minY + scanLineRef.current;
+
+      if (currentScanY >= minY && currentScanY <= maxY) {
+        ctx.save();
+        const lineWidth = (maxX - minX) * 1.15;
+        const left = minX - (lineWidth - (maxX - minX)) / 2;
+        ctx.globalAlpha = 0.5 + opacityRef.current * 0.4;
+        ctx.strokeStyle = '#2EE6D6';
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = '#2EE6D6';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.moveTo(left, currentScanY);
+        ctx.lineTo(left + lineWidth, currentScanY);
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
 
     faceMesh.onResults((results) => {
       if (!results.multiFaceLandmarks || !results.multiFaceLandmarks.length) {
@@ -176,7 +259,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
           image: null,
         };
         setFrameReady(false);
-        smoothedLandmarks = null;
         postToApp(empty);
         return;
       }
@@ -188,25 +270,8 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       }
 
       canvasCtx.save();
-      const raw = results.multiFaceLandmarks[0];
-      smoothedLandmarks = smoothLandmarks(smoothedLandmarks, raw);
-      const landmarks = smoothedLandmarks;
-
-      let minY = Infinity;
-      let maxY = -Infinity;
-      for (const p of landmarks) {
-        const y = p.y * canvasElement.height;
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
-      }
-      scanState = advanceScanState(scanState, maxY - minY);
-      drawFaceScanMesh(
-        canvasCtx,
-        landmarks,
-        canvasElement.width,
-        canvasElement.height,
-        scanState,
-      );
+      const landmarks = results.multiFaceLandmarks[0];
+      drawFaceMesh(canvasCtx, landmarks);
 
       const quality = evaluateFaceQuality(
         videoElement,
