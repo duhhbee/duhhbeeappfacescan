@@ -304,6 +304,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         landmarks,
         cw,
         ch,
+        rawLandmarks,
       );
 
       const ready = quality.qualityOk;

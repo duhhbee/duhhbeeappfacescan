@@ -97,28 +97,28 @@ const getSampleContext = () => {
   return { canvas: sampleCanvas, ctx: sampleCtx };
 };
 
-/** Mean luma + left/right cheek brightness from video frame. */
-export const sampleFaceLighting = (video, landmarks, canvasWidth, canvasHeight) => {
+/** Mean luma + cheek brightness using raw camera-normalized landmarks. */
+export const sampleFaceLighting = (video, landmarks) => {
   if (!video?.videoWidth) return { meanLuma: 0, leftLuma: 0, rightLuma: 0, asymmetryRatio: 1 };
 
   const left = landmark(landmarks, LM.leftCheek);
   const right = landmark(landmarks, LM.rightCheek);
   const nose = landmark(landmarks, LM.noseTip);
   const patch = 0.06;
+  const { ctx, canvas } = getSampleContext();
 
   const toPx = (p) => ({
-    x: p.x * canvasWidth,
-    y: p.y * canvasHeight,
+    x: p.x * canvas.width,
+    y: p.y * canvas.height,
   });
 
-  const { ctx, canvas } = getSampleContext();
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
   const readPatch = (px, py) => {
-    const x = clamp(Math.round(px - (patch * canvasWidth) / 2), 0, canvas.width - 4);
-    const y = clamp(Math.round(py - (patch * canvasHeight) / 2), 0, canvas.height - 4);
-    const w = clamp(Math.round(patch * canvasWidth), 4, canvas.width - x);
-    const h = clamp(Math.round(patch * canvasHeight), 4, canvas.height - y);
+    const x = clamp(Math.round(px - (patch * canvas.width) / 2), 0, canvas.width - 4);
+    const y = clamp(Math.round(py - (patch * canvas.height) / 2), 0, canvas.height - 4);
+    const w = clamp(Math.round(patch * canvas.width), 4, canvas.width - x);
+    const h = clamp(Math.round(patch * canvas.height), 4, canvas.height - y);
     const data = ctx.getImageData(x, y, w, h).data;
     let sum = 0;
     for (let i = 0; i < data.length; i += 4) {
@@ -187,14 +187,14 @@ const isSidePose = (pose) => pose === 'left' || pose === 'right';
  *   metrics: object,
  * }}
  */
-export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight) => {
+export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight, rawLandmarks = landmarks) => {
   const t = QUALITY_THRESHOLDS;
   const widthNorm = faceWidthNorm(landmarks);
   const pose = readPose();
   const side = isSidePose(pose);
   const rawYaw = estimateYawDeg(landmarks);
   const yawDeg = smoothYawDeg(rawYaw, pose);
-  const { meanLuma, asymmetryRatio } = sampleFaceLighting(video, landmarks, canvasWidth, canvasHeight);
+  const { meanLuma, asymmetryRatio } = sampleFaceLighting(video, rawLandmarks);
   const blurVariance = estimateBlurVariance(video);
 
   const minWidth = side ? t.minFaceWidthNormSide : t.minFaceWidthNorm;
