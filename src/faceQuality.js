@@ -6,6 +6,8 @@ const LM = {
   chin: 152,
   leftCheek: 234,
   rightCheek: 454,
+  leftCheekSkin: 50,
+  rightCheekSkin: 280,
 };
 
 export const QUALITY_THRESHOLDS = {
@@ -103,8 +105,9 @@ const getSampleContext = () => {
 export const sampleFaceLighting = (video, landmarks) => {
   if (!video?.videoWidth) return { meanLuma: 0, leftLuma: 0, rightLuma: 0, asymmetryRatio: 1 };
 
-  const left = landmark(landmarks, LM.leftCheek);
-  const right = landmark(landmarks, LM.rightCheek);
+  // Outer cheek landmarks sit beside the ears/sideburns; sample skin instead.
+  const left = landmark(landmarks, LM.leftCheekSkin);
+  const right = landmark(landmarks, LM.rightCheekSkin);
   const nose = landmark(landmarks, LM.noseTip);
   const patch = 0.06;
   const { ctx, canvas } = getSampleContext();

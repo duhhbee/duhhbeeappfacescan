@@ -50,6 +50,8 @@ function fixture(pose, cropped, lighting = 'good') {
   const depth = sign * half * Math.tan(17.5 * Math.PI / 180);
   raw[234] = { x: left, y: 0.45, z: -depth };
   raw[454] = { x: right, y: 0.45, z: depth };
+  raw[50] = { ...raw[234] };
+  raw[280] = { ...raw[454] };
   raw[1] = { x: 0.5 + sign * half * 0.3, y: 0.45, z: 0 };
   const video = {
     videoWidth: cropped ? 1280 : 640,
@@ -134,6 +136,16 @@ test('cropping changes display width but lighting must stay in raw camera coordi
     { x: 64, y: 50, width: 10, height: 7 },
     { x: 86, y: 50, width: 10, height: 7 },
   ]);
+});
+
+test('lighting samples cheek skin rather than the dark temple/ear boundary', () => {
+  const {raw,video}=fixture('center',false);
+  raw[50]={x:0.4,y:0.45,z:0};raw[280]={x:0.6,y:0.45,z:0};
+  video.pixel=(x,y)=> x<0.35 ? 15 : 130;
+  const lighting=sampleFaceLighting(video,raw);
+  assert.ok(Math.abs(lighting.leftLuma-130)<1,JSON.stringify(lighting));
+  assert.ok(Math.abs(lighting.rightLuma-130)<1,JSON.stringify(lighting));
+  assert.ok(lighting.asymmetryRatio<1.1);
 });
 
 test('side poses still reject frontal, wrong-direction and excessive turns', () => {
