@@ -42,15 +42,17 @@ export const faceWidthNorm = (landmarks) => {
   return maxX - minX;
 };
 
-/** Approximate head yaw in degrees (+ = turned to camera-right). */
+/** Approximate head yaw from raw camera 3D cheeks (+ = camera-right).
+ * MediaPipe z uses the same scale as raw x. Display cropping rescales x only.
+ * Nose displacement is not sin(yaw): nose depth can inflate it to +/-90 degrees.
+ */
 export const estimateYawDeg = (landmarks) => {
-  const nose = landmark(landmarks, LM.noseTip);
   const left = landmark(landmarks, LM.leftCheek);
   const right = landmark(landmarks, LM.rightCheek);
-  const midX = (left.x + right.x) / 2;
-  const halfFace = Math.max(0.05, (right.x - left.x) / 2);
-  const offset = (nose.x - midX) / halfFace;
-  return clamp(Math.asin(clamp(offset, -1, 1)) * (180 / Math.PI), -90, 90);
+  const dx = right.x - left.x;
+  const dz = right.z - left.z;
+  if (!Number.isFinite(dx) || !Number.isFinite(dz)) return 0;
+  return clamp(Math.atan2(dz, Math.max(0.000001, dx)) * (180 / Math.PI), -90, 90);
 };
 
 const smoothYawDeg = (rawYaw, pose) => {
@@ -192,7 +194,7 @@ export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight,
   const widthNorm = faceWidthNorm(landmarks);
   const pose = readPose();
   const side = isSidePose(pose);
-  const rawYaw = estimateYawDeg(landmarks);
+  const rawYaw = estimateYawDeg(rawLandmarks);
   const yawDeg = smoothYawDeg(rawYaw, pose);
   const { meanLuma, asymmetryRatio } = sampleFaceLighting(video, rawLandmarks);
   const blurVariance = estimateBlurVariance(video);

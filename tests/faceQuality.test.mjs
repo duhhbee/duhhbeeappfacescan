@@ -46,8 +46,10 @@ function fixture(pose, cropped, lighting = 'good') {
   const half = (right - left) / 2;
   const sign = pose === 'left' ? 1 : pose === 'right' ? -1 : 0;
   const raw = Array.from({ length: 468 }, () => ({ x: 0.5, y: 0.45, z: 0 }));
-  raw[234] = { x: left, y: 0.45, z: 0 };
-  raw[454] = { x: right, y: 0.45, z: 0 };
+  // A real side pose has cheek-depth separation, not only a displaced nose.
+  const depth = sign * half * Math.tan(17.5 * Math.PI / 180);
+  raw[234] = { x: left, y: 0.45, z: -depth };
+  raw[454] = { x: right, y: 0.45, z: depth };
   raw[1] = { x: 0.5 + sign * half * 0.3, y: 0.45, z: 0 };
   const video = {
     videoWidth: cropped ? 1280 : 640,
@@ -73,9 +75,9 @@ function evaluate(pose, width, height, cropped, lighting = 'good', omitRaw = fal
   const result = omitRaw
     ? evaluateFaceQuality(video, display, width, height)
     : evaluateFaceQuality(video, display, width, height, raw);
-  // Coordinate correction must not change the display-based size/yaw/oval contract.
+  // Size and oval use display coordinates; 3D yaw uses raw camera coordinates.
   assert.equal(result.metrics.faceWidthNorm, Number(faceWidthNorm(display).toFixed(3)));
-  assert.equal(result.metrics.rawYawDeg, Number(estimateYawDeg(display).toFixed(1)));
+  assert.equal(result.metrics.rawYawDeg, Number(estimateYawDeg(omitRaw ? display : raw).toFixed(1)));
   assert.equal(result.position, isCenteredInFrameForPose(display, pose, width, height));
   assert.equal(result.faceFound, true);
   return { result, raw, video, display };
@@ -132,6 +134,24 @@ test('cropping changes display width but lighting must stay in raw camera coordi
     { x: 64, y: 50, width: 10, height: 7 },
     { x: 86, y: 50, width: 10, height: 7 },
   ]);
+});
+
+test('side poses still reject frontal, wrong-direction and excessive turns', () => {
+  const {raw,video}=fixture('center',false);
+  for (const pose of ['left','right']) {
+    for (const degrees of [0, pose === 'left' ? -25 : 25, pose === 'left' ? 65 : -65]) {
+      const angle=degrees*Math.PI/180;
+      raw[234]={x:0.3,y:0.45,z:-0.2*Math.tan(angle)};
+      raw[454]={x:0.7,y:0.45,z:0.2*Math.tan(angle)};
+      // Reset smoothing, then fill its full six-frame window with this pose.
+      window.__duhhPose='center';evaluateFaceQuality(video,raw,400,300,raw);
+      window.__duhhPose=pose;
+      let result;
+      for(let i=0;i<6;i++) result=evaluateFaceQuality(video,raw,400,300,raw);
+      assert.equal(result.rejectReason,'head_angle',JSON.stringify({pose,degrees,result}));
+      assert.equal(result.lighting,true);
+    }
+  }
 });
 
 test('FaceMesh passes raw camera landmarks separately while rendering mapped landmarks', () => {
