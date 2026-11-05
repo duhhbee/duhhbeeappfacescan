@@ -20,33 +20,18 @@ export const readGuidePads = () => {
   };
 };
 
-export const readPose = () => {
-  const p = typeof window !== 'undefined' ? window.__duhhPose : undefined;
-  if (p === 'left' || p === 'right' || p === 'center') return p;
-  return 'center';
-};
+// Front-only capture, including when an older bridge injects a side pose.
+export const readPose = () => 'center';
 
-/** On-screen + app copy — “your left” = user’s own left side toward camera (selfie mirror). */
 export const POSE_INSTRUCTIONS = {
   center: {
     title: 'CENTER YOUR FACE',
-    detail: 'Look straight at the camera and keep both cheeks visible.',
-    short: 'Center',
-  },
-  left: {
-    title: 'TURN YOUR FACE LEFT',
-    detail: 'Slowly turn your face to the left.',
-    short: 'Left',
-  },
-  right: {
-    title: 'TURN YOUR FACE RIGHT',
-    detail: 'Slowly turn your face to the right.',
-    short: 'Right',
+    detail: 'Look at the camera for one front photo.',
+    short: 'Front',
   },
 };
 
-export const poseInstruction = (pose) =>
-  POSE_INSTRUCTIONS[pose] ?? POSE_INSTRUCTIONS.center;
+export const poseInstruction = () => POSE_INSTRUCTIONS.center;
 
 /**
  * Oval guide in pixel space (canvas / overlay dimensions).
@@ -80,24 +65,10 @@ export const readGuideEllipseNorm = () => {
   };
 };
 
-/** Pose-aware horizontal shift (mirrored selfie: user left = positive yaw). */
-const poseCenterShiftNorm = (pose) => {
-  if (pose === 'left') return 0.04;
-  if (pose === 'right') return -0.04;
-  return 0;
-};
-
-/**
- * Face centroid inside oval (with small pose shift).
- * @param {number} centerX - normalized 0–1
- * @param {number} centerY - normalized 0–1
- */
-export const isFaceInGuideOval = (centerX, centerY, pose, canvasWidth, canvasHeight) => {
-  const { cx, cy, rx, ry } = readGuideGeom(canvasWidth, canvasHeight);
-  const shiftPx = poseCenterShiftNorm(pose) * canvasWidth;
-  const nx = (centerX * canvasWidth - (cx + shiftPx)) / rx;
-  const ny = (centerY * canvasHeight - cy) / ry;
-  const dist = nx * nx + ny * ny;
-  const margin = pose === 'center' ? 1.08 : 1.14;
-  return dist <= margin * margin;
+/** Loose face-centroid alignment. No angle, size, lighting or blur gates. */
+export const isFaceInGuideOval = (centerX, centerY, _pose, canvasWidth, canvasHeight) => {
+  const { w, h, cx, cy, rx, ry } = readGuideGeom(canvasWidth, canvasHeight);
+  const nx = (centerX * w - cx) / rx;
+  const ny = (centerY * h - cy) / ry;
+  return nx * nx + ny * ny <= 1.2 * 1.2;
 };

@@ -1,21 +1,12 @@
-import { useEffect, useId, useState } from 'react';
-import { readGuideGeom, readPose, poseInstruction } from '../guideGeometry';
+import { useId } from 'react';
+import { readGuideGeom, poseInstruction } from '../guideGeometry';
 
 const GOLD = '#F5C400';
 
 export const FaceScanOverlay = ({ width, height, ready = false }) => {
   const uid = useId().replace(/:/g, '');
-  const [pose, setPose] = useState('center');
-
-  useEffect(() => {
-    const sync = () => setPose(readPose());
-    sync();
-    const id = setInterval(sync, 150);
-    return () => clearInterval(id);
-  }, []);
-
   const { w, h, cx, cy, rx, ry } = readGuideGeom(width, height);
-  const copy = poseInstruction(pose);
+  const copy = poseInstruction();
   const maskId = `mask-${uid}`;
   const glowId = `oval-glow-${uid}`;
 
@@ -26,13 +17,6 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
   const bannerH = 56;
   const bannerX = cx - bannerW / 2;
   const bannerY = Math.max(12, cy - ry - bannerH - 20);
-
-  const turnArrow =
-    pose === 'left'
-      ? { x1: cx + rx * 0.55, y1: cy, x2: cx - rx * 0.35, y2: cy, head: 'left' }
-      : pose === 'right'
-        ? { x1: cx - rx * 0.55, y1: cy, x2: cx + rx * 0.35, y2: cy, head: 'right' }
-        : null;
 
   return (
     <svg
@@ -115,22 +99,6 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
         strokeLinecap="round"
       />
 
-      {turnArrow ? (
-        <g stroke={GOLD} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.85}>
-          <line x1={turnArrow.x1} y1={turnArrow.y1} x2={turnArrow.x2} y2={turnArrow.y2} />
-          {turnArrow.head === 'left' ? (
-            <path
-              d={`M ${turnArrow.x2} ${turnArrow.y2} L ${turnArrow.x2 + 12} ${turnArrow.y2 - 8} M ${turnArrow.x2} ${turnArrow.y2} L ${turnArrow.x2 + 12} ${turnArrow.y2 + 8}`}
-              fill="none"
-            />
-          ) : (
-            <path
-              d={`M ${turnArrow.x2} ${turnArrow.y2} L ${turnArrow.x2 - 12} ${turnArrow.y2 - 8} M ${turnArrow.x2} ${turnArrow.y2} L ${turnArrow.x2 - 12} ${turnArrow.y2 + 8}`}
-              fill="none"
-            />
-          )}
-        </g>
-      ) : (
         <>
           <line
             x1={cx - rx * 0.4}
@@ -149,7 +117,6 @@ export const FaceScanOverlay = ({ width, height, ready = false }) => {
             strokeWidth={1}
           />
         </>
-      )}
     </svg>
   );
 };

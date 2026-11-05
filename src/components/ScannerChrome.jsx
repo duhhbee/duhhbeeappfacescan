@@ -1,26 +1,11 @@
-const TIPS = {
-  no_face: 'Position your face in the oval',
-  too_far: 'Move a little closer',
-  too_close: 'Move slightly back',
-  too_dark: 'Find brighter, even light',
-  too_bright: 'Avoid harsh direct light',
-  uneven_light: 'Light both sides of your face',
-  blurry: 'Hold still — stay in focus',
-  head_angle: 'Look straight at the camera',
-};
-
-const defaultTip = 'Align your face and hold steady';
-
 export const ScannerChrome = ({ scan }) => {
   const s = scan ?? {};
-  const tip =
-    (s.rejectReason && TIPS[s.rejectReason]) ||
-    (s.qualityOk ? 'Perfect — hold still' : s.faceFound ? defaultTip : TIPS.no_face);
-
+  const ready = Boolean(s.faceFound && s.position);
+  const tip = !s.faceFound ? 'Position your face in the oval'
+    : ready ? 'Ready for your front photo' : 'Move your face toward the center';
   const items = [
-    { key: 'light', label: 'Light', ok: Boolean(s.lighting) },
+    { key: 'position', label: 'Position', ok: Boolean(s.position) },
     { key: 'face', label: 'Face', ok: Boolean(s.faceFound) },
-    { key: 'ready', label: 'Ready', ok: Boolean(s.qualityOk) },
   ];
 
   return (
@@ -81,7 +66,7 @@ export const ScannerChrome = ({ scan }) => {
               fontWeight: 600,
               textAlign: 'center',
               marginBottom: 12,
-              color: s.qualityOk ? '#F5C400' : '#fff',
+              color: ready ? '#F5C400' : '#fff',
             }}
           >
             {tip}

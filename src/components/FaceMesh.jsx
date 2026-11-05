@@ -307,7 +307,7 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         rawLandmarks,
       );
 
-      const ready = quality.qualityOk;
+      const ready = quality.faceFound && quality.position;
       const image = ready ? captureImage(canvasElement) : null;
 
       const payload = {

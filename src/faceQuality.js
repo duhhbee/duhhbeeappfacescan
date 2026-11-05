@@ -1,253 +1,49 @@
-import { isFaceInGuideOval, readPose } from './guideGeometry';
+import { isFaceInGuideOval } from './guideGeometry.js';
 
-/** MediaPipe Face Mesh landmark indices (subset). */
-const LM = {
-  noseTip: 1,
-  chin: 152,
-  leftCheek: 234,
-  rightCheek: 454,
-  leftCheekSkin: 50,
-  rightCheekSkin: 280,
-};
-
-export const QUALITY_THRESHOLDS = {
-  minFaceWidthNorm: 0.26,
-  minFaceWidthNormSide: 0.22,
-  maxFaceWidthNorm: 0.82,
-  maxYawDegCenter: 22,
-  minSideYawDeg: 8,
-  maxYawDegSide: 52,
-  minMeanLuma: 45,
-  maxMeanLuma: 220,
-  maxLightAsymmetryRatio: 1.45,
-  maxLightAsymmetryRatioSide: 2.0,
-  minBlurVariance: 90,
-  minBlurVarianceSide: 55,
-};
-
-const YAW_SMOOTH_FRAMES = 6;
-const yawHistory = [];
-let yawSmoothPose = 'center';
-
-const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
-
-const landmark = (landmarks, index) => landmarks[index] ?? landmarks[0];
-
-/** Normalized face bbox width (0–1). */
+/** Normalized display-space face width, used only to reject an empty/degenerate mesh. */
 export const faceWidthNorm = (landmarks) => {
-  let minX = 1;
-  let maxX = 0;
+  let minX = Infinity;
+  let maxX = -Infinity;
   for (const p of landmarks) {
-    if (p.x < minX) minX = p.x;
-    if (p.x > maxX) maxX = p.x;
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
   }
   return maxX - minX;
 };
 
-/** Approximate head yaw from raw camera 3D cheeks (+ = camera-right).
- * MediaPipe z uses the same scale as raw x. Display cropping rescales x only.
- * Nose displacement is not sin(yaw): nose depth can inflate it to +/-90 degrees.
- */
+/** Retained diagnostic utility. Head angle does not gate capture. */
 export const estimateYawDeg = (landmarks) => {
-  const left = landmark(landmarks, LM.leftCheek);
-  const right = landmark(landmarks, LM.rightCheek);
+  const left = landmarks[234] ?? landmarks[0];
+  const right = landmarks[454] ?? landmarks[0];
+  if (!left || !right) return 0;
   const dx = right.x - left.x;
   const dz = right.z - left.z;
   if (!Number.isFinite(dx) || !Number.isFinite(dz)) return 0;
-  return clamp(Math.atan2(dz, Math.max(0.000001, dx)) * (180 / Math.PI), -90, 90);
+  return Math.max(-90, Math.min(90, Math.atan2(dz, Math.max(0.000001, dx)) * (180 / Math.PI)));
 };
 
-const smoothYawDeg = (rawYaw, pose) => {
-  if (pose !== yawSmoothPose) {
-    yawSmoothPose = pose;
-    yawHistory.length = 0;
-  }
-  yawHistory.push(rawYaw);
-  if (yawHistory.length > YAW_SMOOTH_FRAMES) yawHistory.shift();
-  return yawHistory.reduce((sum, v) => sum + v, 0) / yawHistory.length;
-};
-
-const faceCentroid = (landmarks) => {
+export const isCenteredInFrameForPose = (landmarks, _pose, canvasWidth, canvasHeight) => {
   const centerX = landmarks.reduce((sum, p) => sum + p.x, 0) / landmarks.length;
   const centerY = landmarks.reduce((sum, p) => sum + p.y, 0) / landmarks.length;
-  return { centerX, centerY };
+  return isFaceInGuideOval(centerX, centerY, 'center', canvasWidth, canvasHeight);
 };
 
-/** Aligns with on-screen oval guide (see guideGeometry.js). */
-export const isCenteredInFrameForPose = (landmarks, pose, canvasWidth, canvasHeight) => {
-  const { centerX, centerY } = faceCentroid(landmarks);
-  return isFaceInGuideOval(centerX, centerY, pose, canvasWidth, canvasHeight);
-};
-
-/** Selfie preview is mirrored — user "left" matches positive yaw here. */
-const poseYawOk = (pose, yawDeg, t) => {
-  const y = yawDeg;
-  if (pose === 'center') return Math.abs(y) <= t.maxYawDegCenter;
-  if (pose === 'left') return y >= t.minSideYawDeg && Math.abs(y) <= t.maxYawDegSide;
-  if (pose === 'right') return y <= -t.minSideYawDeg && Math.abs(y) <= t.maxYawDegSide;
-  return Math.abs(y) <= t.maxYawDegCenter;
-};
-
-let sampleCanvas = null;
-let sampleCtx = null;
-
-const getSampleContext = () => {
-  if (!sampleCanvas) {
-    sampleCanvas = document.createElement('canvas');
-    sampleCanvas.width = 160;
-    sampleCanvas.height = 120;
-    sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
-  }
-  return { canvas: sampleCanvas, ctx: sampleCtx };
-};
-
-/** Mean luma + cheek brightness using raw camera-normalized landmarks. */
-export const sampleFaceLighting = (video, landmarks) => {
-  if (!video?.videoWidth) return { meanLuma: 0, leftLuma: 0, rightLuma: 0, asymmetryRatio: 1 };
-
-  // Outer cheek landmarks sit beside the ears/sideburns; sample skin instead.
-  const left = landmark(landmarks, LM.leftCheekSkin);
-  const right = landmark(landmarks, LM.rightCheekSkin);
-  const nose = landmark(landmarks, LM.noseTip);
-  const patch = 0.06;
-  const { ctx, canvas } = getSampleContext();
-
-  const toPx = (p) => ({
-    x: p.x * canvas.width,
-    y: p.y * canvas.height,
-  });
-
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  const readPatch = (px, py) => {
-    const x = clamp(Math.round(px - (patch * canvas.width) / 2), 0, canvas.width - 4);
-    const y = clamp(Math.round(py - (patch * canvas.height) / 2), 0, canvas.height - 4);
-    const w = clamp(Math.round(patch * canvas.width), 4, canvas.width - x);
-    const h = clamp(Math.round(patch * canvas.height), 4, canvas.height - y);
-    const data = ctx.getImageData(x, y, w, h).data;
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    }
-    return sum / (data.length / 4);
-  };
-
-  const lPx = toPx(left);
-  const rPx = toPx(right);
-  const nPx = toPx(nose);
-  const leftLuma = readPatch(lPx.x, lPx.y);
-  const rightLuma = readPatch(rPx.x, rPx.y);
-  const meanLuma = readPatch(nPx.x, nPx.y);
-  const bright = Math.max(leftLuma, rightLuma, 1);
-  const dim = Math.max(1, Math.min(leftLuma, rightLuma));
-  const asymmetryRatio = bright / dim;
-
-  return { meanLuma, leftLuma, rightLuma, asymmetryRatio };
-};
-
-/** Laplacian variance — higher = sharper. */
-export const estimateBlurVariance = (video) => {
-  if (!video?.videoWidth) return 0;
-
-  const { ctx, canvas } = getSampleContext();
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-  const gray = new Float32Array(width * height);
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    gray[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-  }
-
-  let sum = 0;
-  let sumSq = 0;
-  let count = 0;
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const i = y * width + x;
-      const lap =
-        -4 * gray[i] +
-        gray[i - 1] +
-        gray[i + 1] +
-        gray[i - width] +
-        gray[i + width];
-      sum += lap;
-      sumSq += lap * lap;
-      count++;
-    }
-  }
-  if (!count) return 0;
-  const mean = sum / count;
-  return sumSq / count - mean * mean;
-};
-
-const isSidePose = (pose) => pose === 'left' || pose === 'right';
-
-/**
- * @returns {{
- *   lighting: boolean,
- *   position: boolean,
- *   faceFound: boolean,
- *   qualityOk: boolean,
- *   rejectReason: string | null,
- *   metrics: object,
- * }}
+/** One front photo: presence plus loose guide centering, independent of camera pixels.
+ * Legacy quality flags remain permissive for older native bridge consumers.
  */
-export const evaluateFaceQuality = (video, landmarks, canvasWidth, canvasHeight, rawLandmarks = landmarks) => {
-  const t = QUALITY_THRESHOLDS;
-  const widthNorm = faceWidthNorm(landmarks);
-  const pose = readPose();
-  const side = isSidePose(pose);
-  const rawYaw = estimateYawDeg(rawLandmarks);
-  const yawDeg = smoothYawDeg(rawYaw, pose);
-  const { meanLuma, asymmetryRatio } = sampleFaceLighting(video, rawLandmarks);
-  const blurVariance = estimateBlurVariance(video);
-
-  const minWidth = side ? t.minFaceWidthNormSide : t.minFaceWidthNorm;
-  const maxAsymmetry = side ? t.maxLightAsymmetryRatioSide : t.maxLightAsymmetryRatio;
-  const minBlur = side ? t.minBlurVarianceSide : t.minBlurVariance;
-
-  let rejectReason = null;
-
-  if (widthNorm < minWidth) rejectReason = 'too_far';
-  else if (widthNorm > t.maxFaceWidthNorm) rejectReason = 'too_close';
-  else if (meanLuma < t.minMeanLuma) rejectReason = 'too_dark';
-  else if (meanLuma > t.maxMeanLuma) rejectReason = 'too_bright';
-  else if (asymmetryRatio > maxAsymmetry) rejectReason = 'uneven_light';
-  else if (blurVariance < minBlur) rejectReason = 'blurry';
-  else if (!poseYawOk(pose, yawDeg, t)) rejectReason = 'head_angle';
-
-  const lighting =
-    meanLuma >= t.minMeanLuma &&
-    meanLuma <= t.maxMeanLuma &&
-    asymmetryRatio <= maxAsymmetry;
-
-  const qualityOk = rejectReason === null;
-  const inFrame = isCenteredInFrameForPose(landmarks, pose, canvasWidth, canvasHeight);
-  /** Oval alignment only — separate from lighting/pose quality (capture uses qualityOk). */
-  const position = inFrame;
-
-  /** True whenever MediaPipe produced a usable landmark set (mesh visible). */
-  const faceFound =
-    Array.isArray(landmarks) &&
-    landmarks.length >= 10 &&
-    Number.isFinite(widthNorm) &&
-    widthNorm > 0.04;
-
+export const evaluateFaceQuality = (_video, landmarks, canvasWidth, canvasHeight) => {
+  const usableMesh = Array.isArray(landmarks) && landmarks.length >= 10 &&
+    landmarks.every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+  const widthNorm = usableMesh ? faceWidthNorm(landmarks) : 0;
+  const faceFound = usableMesh && widthNorm > 0.04;
+  const position = faceFound && isCenteredInFrameForPose(landmarks, 'center', canvasWidth, canvasHeight);
   return {
-    lighting,
-    position,
     faceFound,
+    position,
+    lighting: true,
     faceClear: true,
-    qualityOk,
-    rejectReason,
-    metrics: {
-      faceWidthNorm: Number(widthNorm.toFixed(3)),
-      yawDeg: Number(yawDeg.toFixed(1)),
-      rawYawDeg: Number(rawYaw.toFixed(1)),
-      meanLuma: Number(meanLuma.toFixed(1)),
-      lightAsymmetry: Number(asymmetryRatio.toFixed(2)),
-      blurVariance: Number(blurVariance.toFixed(1)),
-      pose,
-    },
+    qualityOk: faceFound && position,
+    rejectReason: !faceFound ? 'no_face' : !position ? 'position' : null,
+    metrics: { faceWidthNorm: Number(widthNorm.toFixed(3)), pose: 'center' },
   };
 };
