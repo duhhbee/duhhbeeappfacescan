@@ -52,10 +52,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
     }
   };
 
-  const captureImage = (canvas) => {
-    return canvas.toDataURL('image/jpeg', 0.8);
-  };
-
   useEffect(() => {
     const isMobileDevice = () =>
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -77,12 +73,14 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       const mobile = isMobileDevice();
       const candidates = mobile
         ? [
+            { facingMode: { ideal: 'user' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
             { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } },
             { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } },
             { facingMode: { ideal: 'user' } },
             true,
           ]
         : [
+            { width: { ideal: 1920 }, height: { ideal: 1080 } },
             { width: { ideal: 1280 }, height: { ideal: 720 } },
             { width: { ideal: 640 }, height: { ideal: 480 } },
             { facingMode: { ideal: 'user' } },
@@ -308,7 +306,6 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
       );
 
       const ready = quality.faceFound && quality.position;
-      const image = ready ? captureImage(canvasElement) : null;
 
       const payload = {
         faceFound: quality.faceFound,
@@ -318,7 +315,9 @@ export const FaceMeshMirror = ({ windowWidth, windowHeight }) => {
         qualityOk: quality.qualityOk,
         rejectReason: quality.rejectReason,
         metrics: quality.metrics,
-        image,
+        // Status only. Native requests its one JPEG0.92 photo from the video at
+        // videoWidth/videoHeight; encoding this display overlay wastes each frame.
+        image: null,
       };
       setFrameReady(ready);
       postToApp(payload);
